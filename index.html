@@ -397,7 +397,7 @@ async function buildPlayerList(games) {
           players.push({
             name, playerId: r.person?.id, team: side.teamName || '',
             pos: r.position?.abbreviation || '\u2014', prob,
-            yourGuy: YOUR_GUYS.some(yg => name.toLowerCase().includes(yg.toLowerCase().split(' ').pop())),
+            yourGuy: YOUR_GUYS.some(yg => name.toLowerCase() === yg.toLowerCase() || name.toLowerCase().includes(yg.toLowerCase())),
             avg, vsHandAvg: avg, vsHandOPS: ops, kRate,
             pitcher: side.pitcherName, pitcherERA, pitcherHand, pitcherHR9,
             parkFactor: pf, gameTime,
@@ -429,7 +429,7 @@ function renderPlayerList(players) {
 }
 
 function renderYourGuys(players) {
-  const yours = players.filter(p => YOUR_GUYS.some(yg => p.name.toLowerCase().includes(yg.toLowerCase().split(' ').pop())));
+  const yours = players.filter(p => YOUR_GUYS.some(yg => p.name.toLowerCase() === yg.toLowerCase() || p.name.toLowerCase().includes(yg.toLowerCase())));
   if (!yours.length) { document.getElementById('yoursWrap').innerHTML = '<div class="ibox">Your guys may not be playing today or lineups aren\'t posted yet.</div>'; return; }
   yours.sort((a, b) => b.prob - a.prob);
   document.getElementById('yoursWrap').innerHTML = yours.map((p, i) => buildCard(p, i + 1, true, true)).join('');
