@@ -144,7 +144,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v6 top picks</div>
+<div class="ver-tag">v7 my players</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -155,6 +155,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </header>
 <div class="tabs">
   <div class="tab on" id="t-top">&#x1F3C6; Top Picks</div>
+  <div class="tab" id="t-my">&#x2B50; My Players</div>
   <div class="tab" id="t-games">&#x1F3AF; Games</div>
   <div class="tab" id="t-parks">&#x1F3DF; Ballparks</div>
   <div class="tab" id="t-streak">&#x1F525; My Streak</div>
@@ -175,6 +176,21 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
       <div class="spin"></div>
       <div class="load-txt">Building today's picks...</div>
       <div class="load-sub">Pulling season stats + BvP from MLB — can take 30-60s</div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="s-my">
+  <div class="live-bar">
+    <div class="live-txt"><div class="live-dot"></div>LIVE</div>
+    <div class="live-date" id="myDate">Loading...</div>
+    <div class="refresh-btn" id="myRefresh">&#x21BB;</div>
+  </div>
+  <div id="myWrap">
+    <div class="loading">
+      <div class="spin"></div>
+      <div class="load-txt">Checking your players...</div>
+      <div class="load-sub">Looking up today's matchups</div>
     </div>
   </div>
 </div>
@@ -295,6 +311,7 @@ var picks = ls.get('bts_picks') || [null,null];
 
 // Data from the /api/picks backend
 var picksData = null;
+var myPlayersData = null;
 var activeFilter = 'all';
 
 // ========== INIT ==========
@@ -302,6 +319,7 @@ function init() {
   var today = new Date();
   var dateStr = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   document.getElementById('topDate').textContent = dateStr;
+  document.getElementById('myDate').textContent = dateStr;
   document.getElementById('gamesDate').textContent = dateStr;
   renderParks();
   renderStreak();
@@ -313,11 +331,13 @@ function init() {
 
 function wireButtons() {
   document.getElementById('t-top').addEventListener('click', function() { goTab('top'); });
+  document.getElementById('t-my').addEventListener('click', function() { goTab('my'); if (!myPlayersData) loadMyPlayers(); });
   document.getElementById('t-games').addEventListener('click', function() { goTab('games'); if (!picksData) loadTopPicks(); else renderGames(); });
   document.getElementById('t-parks').addEventListener('click', function() { goTab('parks'); });
   document.getElementById('t-streak').addEventListener('click', function() { goTab('streak'); });
   document.getElementById('t-guide').addEventListener('click', function() { goTab('guide'); });
   document.getElementById('topRefresh').addEventListener('click', loadTopPicks);
+  document.getElementById('myRefresh').addEventListener('click', loadMyPlayers);
   document.getElementById('gamesRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('clrPick1').addEventListener('click', function() { clearPick(1); });
   document.getElementById('clrPick2').addEventListener('click', function() { clearPick(2); });
@@ -488,6 +508,108 @@ function renderGames() {
   wrap.innerHTML = html;
 }
 
+// ========== MY PLAYERS ==========
+function loadMyPlayers() {
+  document.getElementById('myWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Checking your players...</div><div class="load-sub">Looking up today\'s matchups</div></div>';
+
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, 60000);
+
+  fetch('/api/myplayers', { signal: controller.signal })
+    .then(function(r) {
+      clearTimeout(timer);
+      if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); });
+      return r.json();
+    })
+    .then(function(data) {
+      if (!data.ok) throw new Error(data.error || 'Backend returned ok=false');
+      myPlayersData = data;
+      renderMyPlayers();
+    })
+    .catch(function(err) {
+      clearTimeout(timer);
+      var msg = err.name === 'AbortError' ? 'Timed out after 60s.' : (err.message || String(err));
+      document.getElementById('myWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26A0;&#xFE0F;</div><div class="err-txt">Could not load My Players</div><div class="err-detail">' + msg + '</div><button class="retry-btn" id="myRetryBtn">&#x21BB; Retry</button></div>';
+      var b = document.getElementById('myRetryBtn'); if (b) b.addEventListener('click', loadMyPlayers);
+    });
+}
+
+function renderMyPlayers() {
+  if (!myPlayersData) return;
+  var wrap = document.getElementById('myWrap');
+  var players = myPlayersData.players || [];
+  var playing = players.filter(function(p) { return p.found && p.playing; });
+  var notPlaying = players.filter(function(p) { return p.found && !p.playing; });
+  var notFound = players.filter(function(p) { return !p.found; });
+
+  var html = '<div class="ibox blu" style="margin-bottom:11px"><strong>' + playing.length + ' of ' + players.length + ' playing today.</strong> Ranked by hit probability. Tap P1 or P2 to use as a pick.</div>';
+
+  if (playing.length) {
+    playing.forEach(function(p, i) {
+      var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
+      var bvpHtml = p.bvpAb > 0
+        ? '<span class="pick-bvp-yes">BvP: ' + p.bvpHits + '-for-' + p.bvpAb + ' (.' + String(Math.round(p.bvpAvg*1000)).padStart(3,'0') + ')</span>'
+        : '<span class="pick-bvp-no">No BvP history</span>';
+      var loc = p.isHome ? '&#x1F3E0; HOME' : '&#x2708;&#xFE0F; AWAY';
+      var pfDisp = Math.round(p.parkFactor * 100);
+      var era = p.pitcherStats && p.pitcherStats.era ? ' (' + p.pitcherStats.era.toFixed(2) + ' ERA)' : '';
+      var pitcherInfo = p.opposingPitcher + era;
+      var nameEsc = String(p.name).replace(/"/g,'&quot;');
+      var teamEsc = String(p.teamAbbr).replace(/"/g,'&quot;');
+
+      html += '<div class="' + cls + '">';
+      html += '<div class="pick-rank">' + (i+1) + '</div>';
+      html += '<div class="pick-main">';
+      html += '<div class="pick-name">' + p.name + '</div>';
+      html += '<div class="pick-vs">' + p.teamAbbr + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
+      html += '<div class="pick-stats">Season .' + String(Math.round((p.seasonAvg||0)*1000)).padStart(3,'0') + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + '</div>';
+      html += '</div>';
+      html += '<div><div class="pick-prob">' + p.hitProb + '%</div><div class="pick-prob-l">Hit Prob</div></div>';
+      html += '<div style="display:flex;flex-direction:column;gap:3px">';
+      html += '<button class="pick-btn" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="1">P1</button>';
+      html += '<button class="pick-btn p2" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="2">P2</button>';
+      html += '</div>';
+      html += '</div>';
+    });
+  }
+
+  if (notPlaying.length) {
+    html += '<div class="sh" style="margin-top:16px">Not Playing Today</div>';
+    notPlaying.forEach(function(p) {
+      html += '<div class="pick-card" style="opacity:.55">';
+      html += '<div class="pick-rank" style="font-size:14px">&#x1F6AB;</div>';
+      html += '<div class="pick-main"><div class="pick-name">' + p.name + '</div><div class="pick-vs">' + p.teamName + ' &middot; ' + p.status + '</div></div>';
+      html += '</div>';
+    });
+  }
+
+  if (notFound.length) {
+    html += '<div class="sh" style="margin-top:16px">Not in MLB</div>';
+    notFound.forEach(function(p) {
+      html += '<div class="pick-card" style="opacity:.5">';
+      html += '<div class="pick-rank" style="font-size:14px">&#x2753;</div>';
+      html += '<div class="pick-main"><div class="pick-name">' + p.requestedName + '</div><div class="pick-vs">' + p.status + '</div></div>';
+      html += '</div>';
+    });
+  }
+
+  wrap.innerHTML = html;
+
+  var btns = wrap.querySelectorAll('.pick-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
+      var team = this.getAttribute('data-team');
+      var prob = parseInt(this.getAttribute('data-prob') || '0', 10);
+      var slot = parseInt(this.getAttribute('data-slot') || '1', 10);
+      picks[slot-1] = { name: name, team: team, prob: prob };
+      ls.set('bts_picks', picks);
+      renderStreak();
+      showToast('Pick ' + slot + ' set: ' + name, 'grn');
+    });
+  }
+}
+
 // ========== PARKS/STREAK/HISTORY (unchanged) ==========
 function renderParks() {
   var sorted = PARKS.slice().sort(function(a,b) { return b.hit - a.hit; });
@@ -542,7 +664,7 @@ function renderHistory() {
   }).join('');
 }
 function goTab(n) {
-  ['top','games','parks','streak','guide'].forEach(function(t) {
+  ['top','my','games','parks','streak','guide'].forEach(function(t) {
     var s = document.getElementById('s-'+t);
     var tb = document.getElementById('t-'+t);
     if (s) s.className = 'screen'+(t===n?' on':'');
