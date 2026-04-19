@@ -1,0 +1,13 @@
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[[redirects]]
+  from = "/api/picks"
+  to = "/.netlify/functions/picks"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://site.api.espn.com/:splat"
+  status = 200
