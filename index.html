@@ -40,11 +40,12 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 @keyframes spin{to{transform:rotate(360deg)}}
 .load-txt{font-size:13px;font-weight:500}
 .load-sub{font-size:11px;color:var(--fog);margin-top:4px}
-.err-box{background:#fff;border:1px solid var(--r3);border-radius:var(--rad);padding:16px;text-align:center;margin:12px 0}
-.err-icon{font-size:28px;margin-bottom:8px}
-.err-txt{font-size:13px;color:var(--red);font-weight:600;margin-bottom:4px}
-.err-sub{font-size:11px;color:var(--fog);margin-bottom:12px;line-height:1.5}
-.retry-btn{background:var(--blu);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer}
+.err-box{background:#fff;border:1px solid var(--r3);border-radius:var(--rad);padding:16px;margin:12px 0}
+.err-icon{font-size:28px;margin-bottom:8px;text-align:center}
+.err-txt{font-size:13px;color:var(--red);font-weight:600;margin-bottom:4px;text-align:center}
+.err-sub{font-size:11px;color:var(--fog);margin-bottom:12px;line-height:1.5;text-align:center}
+.err-detail{font-family:monospace;font-size:10px;background:var(--s2);padding:8px;border-radius:6px;color:var(--txt);word-break:break-all;white-space:pre-wrap;max-height:200px;overflow:auto}
+.retry-btn{background:var(--blu);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:block;margin:10px auto 0}
 .live-bar{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);padding:9px 13px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between}
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--grn);animation:pulse 1.5s infinite;flex-shrink:0;margin-right:6px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -134,7 +135,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v3 Netlify proxy</div>
+<div class="ver-tag">v4 debug</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -232,6 +233,14 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </div>
 
 <script>
+// Global error handler - catches ANY uncaught error and displays it
+window.addEventListener('error', function(e) {
+  var wrap = document.getElementById('gameWrap');
+  if (wrap) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x1F41B;</div><div class="err-txt">JavaScript Error</div><div class="err-sub">An error occurred. Details below:</div><div class="err-detail">' + (e.message || 'Unknown') + '\n\nFile: ' + (e.filename || 'unknown') + '\nLine: ' + (e.lineno || '?') + '</div></div>';
+  }
+});
+
 var PARKS = [
   {name:'Coors Field',team:'Colorado Rockies',hit:117,hr:126,rating:'great'},
   {name:'Fenway Park',team:'Boston Red Sox',hit:110,hr:108,rating:'great'},
@@ -270,7 +279,7 @@ var PARK_FACTORS = {
 
 function getParkFactor(name) {
   if (!name) return 100;
-  var t = name.toLowerCase();
+  var t = String(name).toLowerCase();
   var keys = Object.keys(PARK_FACTORS);
   for (var i = 0; i < keys.length; i++) {
     if (t.indexOf(keys[i]) >= 0) return PARK_FACTORS[keys[i]];
@@ -335,113 +344,137 @@ function fetchWithTimeout(url, ms) {
   });
 }
 
+function showError(title, detail) {
+  document.getElementById('gameWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26A0;&#xFE0F;</div><div class="err-txt">' + title + '</div><div class="err-sub">Tap Refresh below to try again. Error details:</div><div class="err-detail">' + String(detail || 'No details') + '</div><button class="retry-btn" id="retryBtn">&#x21BB; Refresh</button></div>';
+  var b = document.getElementById('retryBtn');
+  if (b) b.addEventListener('click', loadGames);
+}
+
 function loadGames() {
   document.getElementById('gameWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Loading via Netlify proxy...</div><div class="load-sub">8s timeout</div></div>';
 
   var today = new Date();
   var dateStr = today.getFullYear() + '' + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
-  // Uses Netlify proxy from _redirects file - same-origin, no CORS issues
   var url = '/api/apis/site/v2/sports/baseball/mlb/scoreboard?dates=' + dateStr + '&limit=20';
 
   fetchWithTimeout(url, 8000)
     .then(function(r) {
-      if (!r.ok) throw new Error('Server returned ' + r.status);
+      if (!r.ok) throw new Error('Server returned HTTP ' + r.status);
       return r.json();
     })
     .then(function(data) {
-      var events = data.events || [];
-      if (!events.length) {
-        document.getElementById('gameWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No games today</div><div class="err-sub">Check back on a game day or tap Refresh</div></div>';
-        return;
+      try {
+        var events = (data && data.events) || [];
+        if (!events.length) {
+          document.getElementById('gameWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No games today</div><div class="err-sub">Check back on a game day or tap Refresh</div></div>';
+          return;
+        }
+        renderGames(events);
+      } catch (e) {
+        showError('Render failed', (e && e.message ? e.message : e) + '\n\nStack:\n' + (e && e.stack ? e.stack : 'no stack'));
       }
-      renderGames(events);
     })
     .catch(function(err) {
-      document.getElementById('gameWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26A0;&#xFE0F;</div><div class="err-txt">Could not load games</div><div class="err-sub">' + (err.message || 'Network error') + '<br>Tap Refresh to try again</div><button class="retry-btn" id="retryBtn">&#x21BB; Refresh</button></div>';
-      var b = document.getElementById('retryBtn');
-      if (b) b.addEventListener('click', loadGames);
+      showError('Could not load games', (err && err.message) || err || 'Unknown network error');
     });
 }
 
-function getERA(statistics) {
-  if (!statistics) return null;
-  for (var i = 0; i < statistics.length; i++) {
-    var s = statistics[i];
-    if (s.abbreviation === 'ERA' || s.name === 'ERA') return parseFloat(s.displayValue || s.value || 0);
-  }
+function safeERA(stats) {
+  try {
+    if (!stats || !stats.length) return null;
+    for (var i = 0; i < stats.length; i++) {
+      var s = stats[i];
+      if (s && (s.abbreviation === 'ERA' || s.name === 'ERA')) {
+        var v = parseFloat(s.displayValue || s.value || 0);
+        return isNaN(v) ? null : v;
+      }
+    }
+  } catch(e) {}
   return null;
 }
 
 function renderGames(events) {
   var games = [];
 
-  events.forEach(function(ev) {
-    var comp = ev.competitions && ev.competitions[0];
-    if (!comp) return;
+  for (var ei = 0; ei < events.length; ei++) {
+    try {
+      var ev = events[ei];
+      if (!ev) continue;
+      var comp = (ev.competitions && ev.competitions[0]) || null;
+      if (!comp) continue;
 
-    var awayC = null, homeC = null;
-    (comp.competitors || []).forEach(function(c) {
-      if (c.homeAway === 'away') awayC = c;
-      if (c.homeAway === 'home') homeC = c;
-    });
-    if (!awayC || !homeC) return;
+      var awayC = null, homeC = null;
+      var competitors = comp.competitors || [];
+      for (var ci = 0; ci < competitors.length; ci++) {
+        var c = competitors[ci];
+        if (c && c.homeAway === 'away') awayC = c;
+        if (c && c.homeAway === 'home') homeC = c;
+      }
+      if (!awayC || !homeC) continue;
 
-    var awayName = (awayC.team && awayC.team.displayName) || 'Away';
-    var homeName = (homeC.team && homeC.team.displayName) || 'Home';
-    var awayAbbr = (awayC.team && awayC.team.abbreviation) || '';
-    var homeAbbr = (homeC.team && homeC.team.abbreviation) || '';
-    var pf = getParkFactor(homeName);
-    var venue = (comp.venue && comp.venue.fullName) || '';
+      var awayName = (awayC.team && awayC.team.displayName) || 'Away';
+      var homeName = (homeC.team && homeC.team.displayName) || 'Home';
+      var awayAbbr = (awayC.team && awayC.team.abbreviation) || '';
+      var homeAbbr = (homeC.team && homeC.team.abbreviation) || '';
+      var pf = getParkFactor(homeName);
+      var venue = (comp.venue && comp.venue.fullName) || '';
 
-    var awayPitcher = 'TBD', homePitcher = 'TBD';
-    var awayERA = null, homeERA = null;
-    var probables = comp.probables || [];
-    probables.forEach(function(pr) {
-      var nm = (pr.athlete && pr.athlete.displayName) || 'TBD';
-      var era = getERA(pr.statistics);
-      if (pr.homeAway === 'away') { awayPitcher = nm; awayERA = era; }
-      if (pr.homeAway === 'home') { homePitcher = nm; homeERA = era; }
-    });
+      var awayPitcher = 'TBD', homePitcher = 'TBD';
+      var awayERA = null, homeERA = null;
+      var probables = comp.probables || [];
+      for (var pi = 0; pi < probables.length; pi++) {
+        var pr = probables[pi];
+        if (!pr) continue;
+        var nm = (pr.athlete && pr.athlete.displayName) || 'TBD';
+        var era = safeERA(pr.statistics);
+        if (pr.homeAway === 'away') { awayPitcher = nm; awayERA = era; }
+        if (pr.homeAway === 'home') { homePitcher = nm; homeERA = era; }
+      }
 
-    var gameTime = '';
-    try { gameTime = new Date(ev.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); } catch(e) {}
+      var gameTime = '';
+      try { gameTime = new Date(ev.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); } catch(e) {}
 
-    var awayScore = ((awayERA || 4.0) / 4.0) * (pf / 100) * 50;
-    var homeScore = ((homeERA || 4.0) / 4.0) * (pf / 100) * 50;
-    var gameScore = Math.round((awayScore + homeScore) / 2);
+      var awayScore = ((awayERA || 4.0) / 4.0) * (pf / 100) * 50;
+      var homeScore = ((homeERA || 4.0) / 4.0) * (pf / 100) * 50;
+      var gameScore = Math.round((awayScore + homeScore) / 2);
 
-    var awayEraC = awayERA == null ? '' : awayERA >= 4.5 ? 'color:var(--grn)' : awayERA >= 3.5 ? 'color:var(--gold)' : 'color:var(--red)';
-    var homeEraC = homeERA == null ? '' : homeERA >= 4.5 ? 'color:var(--grn)' : homeERA >= 3.5 ? 'color:var(--gold)' : 'color:var(--red)';
+      var awayEraC = awayERA == null ? '' : awayERA >= 4.5 ? 'color:var(--grn)' : awayERA >= 3.5 ? 'color:var(--gold)' : 'color:var(--red)';
+      var homeEraC = homeERA == null ? '' : homeERA >= 4.5 ? 'color:var(--grn)' : homeERA >= 3.5 ? 'color:var(--gold)' : 'color:var(--red)';
 
-    var tip = '';
-    var avgERA = ((awayERA || 4.0) + (homeERA || 4.0)) / 2;
-    if (pf >= 106 && avgERA >= 4.0) tip = '&#x1F525; Strong BTS game - hitter-friendly park + weak pitching';
-    else if (pf >= 103 && avgERA >= 3.75) tip = '&#x1F7E1; Good BTS spot - above average conditions';
-    else if (pf <= 94 || avgERA < 3.0) tip = '&#x1F976; Tough day - avoid unless you have a hot bat';
-    else tip = '&#x26AA; Average conditions - look for contact hitters';
+      var tip = '';
+      var avgERA = ((awayERA || 4.0) + (homeERA || 4.0)) / 2;
+      if (pf >= 106 && avgERA >= 4.0) tip = '&#x1F525; Strong BTS game - hitter-friendly park + weak pitching';
+      else if (pf >= 103 && avgERA >= 3.75) tip = '&#x1F7E1; Good BTS spot - above average conditions';
+      else if (pf <= 94 || avgERA < 3.0) tip = '&#x1F976; Tough day - avoid unless you have a hot bat';
+      else tip = '&#x26AA; Average conditions - look for contact hitters';
 
-    games.push({
-      id: ev.id,
-      awayName: awayName, homeName: homeName,
-      awayAbbr: awayAbbr, homeAbbr: homeAbbr,
-      awayPitcher: awayPitcher, homePitcher: homePitcher,
-      awayERA: awayERA, homeERA: homeERA,
-      awayEraC: awayEraC, homeEraC: homeEraC,
-      pf: pf, venue: venue, gameTime: gameTime,
-      gameScore: gameScore, tip: tip,
-      status: (comp.status && comp.status.type && comp.status.type.description) || ''
-    });
-  });
+      games.push({
+        id: ev.id,
+        awayName: awayName, homeName: homeName,
+        awayAbbr: awayAbbr, homeAbbr: homeAbbr,
+        awayPitcher: awayPitcher, homePitcher: homePitcher,
+        awayERA: awayERA, homeERA: homeERA,
+        awayEraC: awayEraC, homeEraC: homeEraC,
+        pf: pf, venue: venue, gameTime: gameTime,
+        gameScore: gameScore, tip: tip,
+        status: (comp.status && comp.status.type && comp.status.type.description) || ''
+      });
+    } catch(e) {
+      // Skip this game if it fails to parse, but keep going
+      continue;
+    }
+  }
 
   games.sort(function(a,b) { return b.gameScore - a.gameScore; });
 
   var html = '';
   if (!games.length) {
-    html = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No game data available</div><div class="err-sub">Lineups and pitchers may not be posted yet. Try again closer to game time.</div></div>';
+    html = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No game data available</div><div class="err-sub">Got ' + events.length + ' events from ESPN but none could be parsed.</div></div>';
   } else {
-    html = '<div class="ibox blu" style="margin-bottom:11px">Games ranked best to worst for BTS. Green ERA = weak pitcher = easier to get a hit.</div>';
-    games.forEach(function(g, i) {
-      var cls = i === 0 ? 'gcard hot' : i <= 2 ? 'gcard good' : 'gcard';
+    html = '<div class="ibox blu" style="margin-bottom:11px">' + games.length + ' games today, ranked best to worst for BTS. Green ERA = weak pitcher = easier to get a hit.</div>';
+    for (var gi = 0; gi < games.length; gi++) {
+      var g = games[gi];
+      var cls = gi === 0 ? 'gcard hot' : gi <= 2 ? 'gcard good' : 'gcard';
       var scoreC = g.gameScore >= 55 ? 'ph' : g.gameScore >= 45 ? 'pm' : 'pl';
       var awayEraDisp = g.awayERA != null ? g.awayERA.toFixed(2) : 'TBD';
       var homeEraDisp = g.homeERA != null ? g.homeERA.toFixed(2) : 'TBD';
@@ -466,7 +499,7 @@ function renderGames(events) {
       html += '<div class="gbtn p2" data-game="' + g.id + '" data-team="' + g.homeName + '" data-num="1">&#x2B50; Pick ' + g.homeAbbr + ' batter (P1)</div>';
       html += '</div>';
       html += '</div></div>';
-    });
+    }
   }
 
   document.getElementById('gameWrap').innerHTML = html;
