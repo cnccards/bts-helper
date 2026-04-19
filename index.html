@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -46,12 +45,33 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 .err-sub{font-size:11px;color:var(--fog);margin-bottom:12px;line-height:1.5;text-align:center}
 .err-detail{font-family:monospace;font-size:10px;background:var(--s2);padding:8px;border-radius:6px;color:var(--txt);word-break:break-all;white-space:pre-wrap;max-height:200px;overflow:auto}
 .retry-btn{background:var(--blu);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:block;margin:10px auto 0}
-.live-bar{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);padding:9px 13px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between}
+.live-bar{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);padding:9px 13px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--grn);animation:pulse 1.5s infinite;flex-shrink:0;margin-right:6px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .live-txt{font-size:11px;font-weight:600;color:var(--grn);display:flex;align-items:center}
-.live-date{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:var(--blu)}
+.live-date{font-family:'Oswald',sans-serif;font-size:12px;font-weight:600;color:var(--blu)}
 .refresh-btn{font-size:10px;color:var(--blu);cursor:pointer;padding:4px 9px;border:1px solid var(--b3);border-radius:5px;background:var(--b2);font-weight:600}
+.pick-card{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);overflow:hidden;margin-bottom:9px;padding:11px 13px;display:flex;align-items:center;gap:10px}
+.pick-card.hot{border-color:var(--g3);background:linear-gradient(90deg,#fff 0%,rgba(184,120,0,.04) 100%)}
+.pick-card.good{border-color:var(--b3)}
+.pick-rank{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:var(--fog);min-width:28px;text-align:center}
+.pick-card.hot .pick-rank{color:var(--gold)}
+.pick-card.good .pick-rank{color:var(--blu)}
+.pick-main{flex:1;min-width:0}
+.pick-name{font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick-vs{font-size:10px;color:var(--fog);margin-top:3px;line-height:1.3}
+.pick-stats{font-size:10px;color:var(--txt);margin-top:4px;font-family:monospace}
+.pick-bvp-yes{color:var(--grn);font-weight:600}
+.pick-bvp-no{color:var(--fog)}
+.pick-prob{font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:var(--blu);line-height:1;text-align:right;min-width:52px}
+.pick-card.hot .pick-prob{color:var(--gold)}
+.pick-prob-l{font-size:7px;color:var(--fog);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;text-align:right}
+.pick-btn{background:var(--grn2);border:1px solid var(--grn3);color:var(--grn);border-radius:5px;font-size:9px;font-weight:700;padding:5px 8px;cursor:pointer;font-family:inherit;margin-left:6px;flex-shrink:0}
+.pick-btn.p2{background:var(--b2);border-color:var(--b3);color:var(--blu)}
+.filter-row{display:flex;gap:6px;margin-bottom:11px;overflow-x:auto;scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+.fbtn{padding:6px 10px;border:1px solid var(--bdr);background:#fff;border-radius:99px;font-size:10px;font-weight:600;color:var(--fog);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0}
+.fbtn.on{background:var(--blu);color:#fff;border-color:var(--blu)}
 .gcard{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);overflow:hidden;margin-bottom:10px}
 .gcard.hot{border-color:var(--g3);background:linear-gradient(135deg,#fff 0%,rgba(184,120,0,.04) 100%)}
 .gcard.good{border-color:var(--b3)}
@@ -69,15 +89,6 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 .gpill-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--fog);font-family:monospace;margin-bottom:3px}
 .gpill-name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gpill-era{font-size:11px;font-family:monospace;margin-top:1px}
-.gstats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
-.gstat{background:var(--s2);border-radius:6px;padding:7px;text-align:center}
-.gstat-v{font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;line-height:1}
-.gstat-l{font-size:8px;color:var(--fog);text-transform:uppercase;letter-spacing:.07em;margin-top:3px}
-.gbtn-row{display:flex;gap:7px;margin-top:9px}
-.gbtn{flex:1;padding:8px;border-radius:7px;border:1px solid var(--bdr);font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;text-align:center}
-.gbtn.p1{background:var(--grn2);border-color:var(--grn3);color:var(--grn)}
-.gbtn.p2{background:var(--b2);border-color:var(--b3);color:var(--blu)}
-.gtip{font-size:11px;color:var(--txt);background:var(--s2);border-radius:7px;padding:8px 10px;margin-top:8px;line-height:1.5}
 .park-tbl{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);overflow:hidden;margin-bottom:10px}
 .park-hd{display:grid;grid-template-columns:1fr 50px 50px 50px;padding:7px 12px;background:var(--s2);border-bottom:1px solid var(--bdr);font-size:8px;color:var(--fog);text-transform:uppercase;letter-spacing:.1em}
 .park-row{display:grid;grid-template-columns:1fr 50px 50px 50px;padding:8px 12px;border-bottom:1px solid var(--bdr);align-items:center}
@@ -113,8 +124,6 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 .acc-lbl{font-size:8px;color:var(--fog);text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
 .acc-bar-bg{height:8px;background:var(--dim);border-radius:99px;overflow:hidden}
 .acc-bar-fill{height:100%;border-radius:99px;background:var(--grn);transition:width .6s ease}
-.manual-pick-box{background:#fff;border:1px solid var(--bdr);border-radius:var(--rad);padding:13px;margin-bottom:10px}
-.manual-pick-box input{width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--bdr2);background:var(--s3);color:var(--txt);font-family:inherit;font-size:12px;margin-bottom:7px}
 .hist-item{display:flex;align-items:center;gap:9px;padding:8px 13px;border-bottom:1px solid var(--bdr);font-size:11px}
 .hist-item:last-child{border-bottom:none}
 .hist-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
@@ -135,30 +144,49 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v5 fixed</div>
+<div class="ver-tag">v6 top picks</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
     <div class="logo-ico">&#x26BE;</div>
-    <div><div class="logo-t">Beat The Streak</div><div class="logo-s">ESPN Live Data</div></div>
+    <div><div class="logo-t">Beat The Streak</div><div class="logo-s">MLB Stats Live</div></div>
   </div>
   <div class="prize-box"><div class="prize-amt">$5.6M</div><div class="prize-l">57-game prize</div></div>
 </header>
 <div class="tabs">
-  <div class="tab on" id="t-picks">&#x1F3AF; Today's Games</div>
+  <div class="tab on" id="t-top">&#x1F3C6; Top Picks</div>
+  <div class="tab" id="t-games">&#x1F3AF; Games</div>
   <div class="tab" id="t-parks">&#x1F3DF; Ballparks</div>
   <div class="tab" id="t-streak">&#x1F525; My Streak</div>
   <div class="tab" id="t-guide">&#x1F4D6; Strategy</div>
 </div>
 
-<div class="screen on" id="s-picks">
+<div class="screen on" id="s-top">
   <div class="live-bar">
-    <div class="live-txt"><div class="live-dot"></div>ESPN LIVE</div>
-    <div class="live-date" id="todayDate">Loading...</div>
-    <div class="refresh-btn" id="refreshBtn">&#x21BB; Refresh</div>
+    <div class="live-txt"><div class="live-dot"></div>LIVE</div>
+    <div class="live-date" id="topDate">Loading...</div>
+    <div class="refresh-btn" id="topRefresh">&#x21BB;</div>
   </div>
-  <div id="gameWrap">
-    <div class="loading"><div class="spin"></div><div class="load-txt">Loading via Netlify proxy...</div><div class="load-sub">8s timeout</div></div>
+  <div class="filter-row" id="topFilter" style="display:none">
+    <div class="fbtn on" data-f="all">All Games</div>
+  </div>
+  <div id="topWrap">
+    <div class="loading">
+      <div class="spin"></div>
+      <div class="load-txt">Building today's picks...</div>
+      <div class="load-sub">Pulling season stats + BvP from MLB — can take 30-60s</div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="s-games">
+  <div class="live-bar">
+    <div class="live-txt"><div class="live-dot"></div>LIVE</div>
+    <div class="live-date" id="gamesDate">Loading...</div>
+    <div class="refresh-btn" id="gamesRefresh">&#x21BB;</div>
+  </div>
+  <div id="gamesWrap">
+    <div class="loading"><div class="spin"></div><div class="load-txt">Loading games...</div></div>
   </div>
 </div>
 
@@ -181,7 +209,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
   <div class="picks-box">
     <div class="pick-slot">
       <div class="pick-n">P1</div>
-      <div class="pick-player"><div class="pick-nm" id="p1name">-- No pick --</div><div class="pick-d" id="p1det">Go to Today's Games tab and tap Pick 1</div></div>
+      <div class="pick-player"><div class="pick-nm" id="p1name">-- No pick --</div><div class="pick-d" id="p1det">Go to Top Picks tab and tap a player</div></div>
       <div class="pick-p" id="p1prob">--</div>
       <button class="pick-x" id="clrPick1">&#x2715;</button>
     </div>
@@ -209,38 +237,29 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
     <div class="acc-bar-bg"><div class="acc-bar-fill" id="accBar" style="width:0%"></div></div>
     <div style="font-size:9px;color:var(--fog);margin-top:6px;text-align:center" id="accLabel">Record results above to track accuracy</div>
   </div>
-  <div class="sh">Add Manual Pick</div>
-  <div class="manual-pick-box">
-    <div style="font-size:11px;color:var(--fog);margin-bottom:8px">Add a pick manually:</div>
-    <input id="manPickName" placeholder="Player name (e.g. Manny Machado)"/>
-    <input id="manPickTeam" placeholder="Team (e.g. San Diego)"/>
-    <div style="display:flex;gap:7px">
-      <button id="manPick1" style="flex:1;padding:8px;background:var(--grn2);border:1px solid var(--grn3);color:var(--grn);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Set as Pick 1</button>
-      <button id="manPick2" style="flex:1;padding:8px;background:var(--b2);border:1px solid var(--b3);color:var(--blu);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Set as Pick 2</button>
-    </div>
-  </div>
   <div class="sh">History</div>
   <div class="park-tbl"><div id="histList" style="padding:4px 0"></div></div>
 </div>
 
 <div class="screen" id="s-guide">
-  <div class="sh">The Winning Formula</div>
-  <div class="ibox gold"><strong>Contact over power.</strong> Luis Arraez hits .308 and puts almost every ball in play. Aaron Judge gets walked and pitched around. For BTS, contact rate beats power every time.</div>
-  <div class="ibox grn"><strong>Great BTS pick checklist:</strong><br>&#x2713; Batting avg <strong>.285+</strong><br>&#x2713; Strikeout rate <strong>under 18%</strong><br>&#x2713; Facing pitcher with <strong>ERA 4.00+</strong><br>&#x2713; Playing in <strong>hitter-friendly park</strong><br>&#x2713; Good career history vs this pitcher</div>
+  <div class="sh">How Hit Probability is Calculated</div>
+  <div class="ibox gold"><strong>Pulling live from MLB Stats API:</strong><br>&bull; Each team's top 10 batters by season AVG (min 20 ABs)<br>&bull; Career batter vs pitcher (BvP) record<br>&bull; Ballpark hit factor<br>&bull; Starting pitcher ERA/WHIP/BAA</div>
+  <div class="ibox grn"><strong>Formula:</strong><br>Season AVG blended with BvP (40% weight if 10+ ABs, 20% if 5-9 ABs) &times; park factor. Converted from per-AB probability to per-game (4 AB) probability.</div>
   <div class="ibox blu"><strong>Double Down:</strong> Only when BOTH picks are 68%+. If either is under 65%, go single pick.</div>
-  <div class="ibox red"><strong>Avoid:</strong><br>&#x2717; Power hitters in pitcher's parks<br>&#x2717; Anyone vs ace (ERA under 2.50)<br>&#x2717; Player mid-slump (0-for-12+)<br>&#x2717; Big name without checking lineup</div>
+  <div class="ibox red"><strong>Still avoid:</strong><br>&#x2717; Batters we show but you notice are slumping (0-for-20)<br>&#x2717; Pitchers with ERA under 2.50 regardless<br>&#x2717; Never-start lineups (check scratches at game time)</div>
   <div class="ibox">&#x1F6E1; <strong>Streak Saver</strong> activates at 10-game streak automatically.</div>
 </div>
 
 <script>
-// Global error handler - catches ANY uncaught error and displays it
+// ========== GLOBAL ERROR HANDLER ==========
 window.addEventListener('error', function(e) {
-  var wrap = document.getElementById('gameWrap');
-  if (wrap) {
-    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x1F41B;</div><div class="err-txt">JavaScript Error</div><div class="err-sub">An error occurred. Details below:</div><div class="err-detail">' + (e.message || 'Unknown') + '\n\nFile: ' + (e.filename || 'unknown') + '\nLine: ' + (e.lineno || '?') + '</div></div>';
+  var wrap = document.getElementById('topWrap') || document.getElementById('gamesWrap');
+  if (wrap && wrap.innerHTML.indexOf('Building') >= 0) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x1F41B;</div><div class="err-txt">JavaScript Error</div><div class="err-detail">' + (e.message || 'Unknown') + '\nLine: ' + (e.lineno || '?') + '</div></div>';
   }
 });
 
+// ========== PARK DATA ==========
 var PARKS = [
   {name:'Coors Field',team:'Colorado Rockies',hit:117,hr:126,rating:'great'},
   {name:'Fenway Park',team:'Boston Red Sox',hit:110,hr:108,rating:'great'},
@@ -261,32 +280,10 @@ var PARKS = [
   {name:'Angel Stadium',team:'LA Angels',hit:95,hr:93,rating:'bad'},
   {name:'Petco Park',team:'San Diego',hit:94,hr:88,rating:'bad'},
   {name:'T-Mobile Park',team:'Seattle',hit:93,hr:91,rating:'bad'},
-  {name:'Oakland Coliseum',team:'Athletics',hit:96,hr:88,rating:'bad'}
+  {name:'Sutter Health Park',team:'Athletics',hit:96,hr:88,rating:'bad'}
 ];
 
-var PARK_FACTORS = {
-  'rockies':117,'colorado':117,'red sox':110,'boston':110,'reds':109,'cincinnati':109,
-  'cubs':104,'phillies':103,'philadelphia':103,'dodgers':103,'astros':102,'houston':102,
-  'rangers':100,'texas':100,'braves':100,'atlanta':100,'blue jays':100,'toronto':100,
-  'giants':101,'san francisco':101,'yankees':98,'royals':98,'kansas city':98,
-  'guardians':97,'cleveland':97,'rays':97,'tampa':97,'nationals':96,'washington':96,
-  'angels':95,'padres':94,'san diego':94,'mariners':93,'seattle':93,
-  'athletics':96,'oakland':96,'white sox':98,'tigers':98,'detroit':98,
-  'twins':99,'minnesota':99,'orioles':98,'baltimore':98,'mets':97,
-  'cardinals':99,'st. louis':99,'brewers':99,'milwaukee':99,
-  'pirates':98,'pittsburgh':98,'marlins':94,'miami':94,'diamondbacks':100,'arizona':100
-};
-
-function getParkFactor(name) {
-  if (!name) return 100;
-  var t = String(name).toLowerCase();
-  var keys = Object.keys(PARK_FACTORS);
-  for (var i = 0; i < keys.length; i++) {
-    if (t.indexOf(keys[i]) >= 0) return PARK_FACTORS[keys[i]];
-  }
-  return 100;
-}
-
+// ========== LOCAL STORAGE ==========
 var ls = {
   get: function(k) { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } },
   set: function(k,v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
@@ -296,228 +293,202 @@ var streak = ls.get('bts_streak') || 0;
 var btsHist = ls.get('bts_history') || [];
 var picks = ls.get('bts_picks') || [null,null];
 
+// Data from the /api/picks backend
+var picksData = null;
+var activeFilter = 'all';
+
+// ========== INIT ==========
 function init() {
   var today = new Date();
-  document.getElementById('todayDate').textContent = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  var dateStr = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('topDate').textContent = dateStr;
+  document.getElementById('gamesDate').textContent = dateStr;
   renderParks();
   renderStreak();
   renderHistory();
   wireButtons();
-  goTab('picks');
-  loadGames();
+  goTab('top');
+  loadTopPicks();
 }
 
 function wireButtons() {
-  document.getElementById('t-picks').addEventListener('click', function() { goTab('picks'); });
+  document.getElementById('t-top').addEventListener('click', function() { goTab('top'); });
+  document.getElementById('t-games').addEventListener('click', function() { goTab('games'); if (!picksData) loadTopPicks(); else renderGames(); });
   document.getElementById('t-parks').addEventListener('click', function() { goTab('parks'); });
   document.getElementById('t-streak').addEventListener('click', function() { goTab('streak'); });
   document.getElementById('t-guide').addEventListener('click', function() { goTab('guide'); });
-  document.getElementById('refreshBtn').addEventListener('click', loadGames);
+  document.getElementById('topRefresh').addEventListener('click', loadTopPicks);
+  document.getElementById('gamesRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('clrPick1').addEventListener('click', function() { clearPick(1); });
   document.getElementById('clrPick2').addEventListener('click', function() { clearPick(2); });
   document.getElementById('btnHit').addEventListener('click', function() { recordResult('hit'); });
   document.getElementById('btnMiss').addEventListener('click', function() { recordResult('miss'); });
   document.getElementById('btnReset').addEventListener('click', resetStreak);
-  document.getElementById('manPick1').addEventListener('click', function() { setManualPick(1); });
-  document.getElementById('manPick2').addEventListener('click', function() { setManualPick(2); });
 }
 
-function fetchWithTimeout(url, ms) {
-  return new Promise(function(resolve, reject) {
-    var done = false;
-    var timer = setTimeout(function() {
-      if (done) return;
-      done = true;
-      reject(new Error('Request timed out after ' + (ms/1000) + 's'));
-    }, ms);
-    fetch(url).then(function(r) {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      resolve(r);
-    }).catch(function(e) {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      reject(e);
-    });
-  });
-}
+// ========== LOAD PICKS FROM BACKEND ==========
+function loadTopPicks() {
+  document.getElementById('topWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Building today\'s picks...</div><div class="load-sub">Pulling from MLB Stats API — this takes 30-60s on first load</div></div>';
+  document.getElementById('gamesWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Loading games...</div></div>';
+  document.getElementById('topFilter').style.display = 'none';
 
-function showError(title, detail) {
-  document.getElementById('gameWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26A0;&#xFE0F;</div><div class="err-txt">' + title + '</div><div class="err-sub">Tap Refresh below to try again. Error details:</div><div class="err-detail">' + String(detail || 'No details') + '</div><button class="retry-btn" id="retryBtn">&#x21BB; Refresh</button></div>';
-  var b = document.getElementById('retryBtn');
-  if (b) b.addEventListener('click', loadGames);
-}
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, 90000); // 90s hard cap
 
-function loadGames() {
-  document.getElementById('gameWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Loading via Netlify proxy...</div><div class="load-sub">8s timeout</div></div>';
-
-  var today = new Date();
-  var dateStr = today.getFullYear() + '' + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
-  var url = '/api/apis/site/v2/sports/baseball/mlb/scoreboard?dates=' + dateStr + '&limit=20';
-
-  fetchWithTimeout(url, 8000)
+  fetch('/api/picks', { signal: controller.signal })
     .then(function(r) {
-      if (!r.ok) throw new Error('Server returned HTTP ' + r.status);
+      clearTimeout(timer);
+      if (!r.ok) {
+        return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); });
+      }
       return r.json();
     })
     .then(function(data) {
-      try {
-        var events = (data && data.events) || [];
-        if (!events.length) {
-          document.getElementById('gameWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No games today</div><div class="err-sub">Check back on a game day or tap Refresh</div></div>';
-          return;
-        }
-        renderGames(events);
-      } catch (e) {
-        showError('Render failed', (e && e.message ? e.message : e) + '\n\nStack:\n' + (e && e.stack ? e.stack : 'no stack'));
-      }
+      if (!data.ok) throw new Error(data.error || 'Backend returned ok=false');
+      picksData = data;
+      renderTop();
+      renderGames();
+      showToast(data.pickCount + ' picks ready (' + Math.round(data.elapsedMs/1000) + 's)', 'grn');
     })
     .catch(function(err) {
-      showError('Could not load games', (err && err.message) || err || 'Unknown network error');
+      clearTimeout(timer);
+      var msg = err.name === 'AbortError' ? 'Timed out after 90 seconds. The backend is still processing — wait a minute and refresh.' : (err.message || String(err));
+      document.getElementById('topWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26A0;&#xFE0F;</div><div class="err-txt">Could not load picks</div><div class="err-detail">' + msg + '</div><button class="retry-btn" id="retryBtn">&#x21BB; Retry</button></div>';
+      document.getElementById('gamesWrap').innerHTML = document.getElementById('topWrap').innerHTML.replace('id="retryBtn"', 'id="retryBtn2"');
+      var b = document.getElementById('retryBtn'); if (b) b.addEventListener('click', loadTopPicks);
+      var b2 = document.getElementById('retryBtn2'); if (b2) b2.addEventListener('click', loadTopPicks);
     });
 }
 
-function safeERA(stats) {
-  try {
-    if (!stats || !stats.length) return null;
-    for (var i = 0; i < stats.length; i++) {
-      var s = stats[i];
-      if (s && (s.abbreviation === 'ERA' || s.name === 'ERA')) {
-        var v = parseFloat(s.displayValue || s.value || 0);
-        return isNaN(v) ? null : v;
-      }
-    }
-  } catch(e) {}
-  return null;
-}
+// ========== RENDER TOP PICKS ==========
+function renderTop() {
+  if (!picksData) return;
+  var wrap = document.getElementById('topWrap');
 
-function renderGames(events) {
-  var games = [];
-
-  for (var ei = 0; ei < events.length; ei++) {
-    try {
-      var ev = events[ei];
-      if (!ev) continue;
-      var comp = (ev.competitions && ev.competitions[0]) || null;
-      if (!comp) continue;
-
-      var awayC = null, homeC = null;
-      var competitors = comp.competitors || [];
-      for (var ci = 0; ci < competitors.length; ci++) {
-        var c = competitors[ci];
-        if (c && c.homeAway === 'away') awayC = c;
-        if (c && c.homeAway === 'home') homeC = c;
-      }
-      if (!awayC || !homeC) continue;
-
-      var awayName = (awayC.team && awayC.team.displayName) || 'Away';
-      var homeName = (homeC.team && homeC.team.displayName) || 'Home';
-      var awayAbbr = (awayC.team && awayC.team.abbreviation) || '';
-      var homeAbbr = (homeC.team && homeC.team.abbreviation) || '';
-      var pf = getParkFactor(homeName);
-      var venue = (comp.venue && comp.venue.fullName) || '';
-
-      var awayPitcher = 'TBD', homePitcher = 'TBD';
-      var awayERA = null, homeERA = null;
-      var probables = comp.probables || [];
-      for (var pi = 0; pi < probables.length; pi++) {
-        var pr = probables[pi];
-        if (!pr) continue;
-        var nm = (pr.athlete && pr.athlete.displayName) || 'TBD';
-        var era = safeERA(pr.statistics);
-        if (pr.homeAway === 'away') { awayPitcher = nm; awayERA = era; }
-        if (pr.homeAway === 'home') { homePitcher = nm; homeERA = era; }
-      }
-
-      var gameTime = '';
-      try { gameTime = new Date(ev.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); } catch(e) {}
-
-      var awayScore = ((awayERA || 4.0) / 4.0) * (pf / 100) * 50;
-      var homeScore = ((homeERA || 4.0) / 4.0) * (pf / 100) * 50;
-      var gameScore = Math.round((awayScore + homeScore) / 2);
-
-      var awayEraC = awayERA == null ? '' : awayERA >= 4.5 ? 'color:var(--grn)' : awayERA >= 3.5 ? 'color:var(--gold)' : 'color:var(--red)';
-      var homeEraC = homeERA == null ? '' : homeERA >= 4.5 ? 'color:var(--grn)' : homeERA >= 3.5 ? 'color:var(--gold)' : 'color:var(--red)';
-
-      var tip = '';
-      var avgERA = ((awayERA || 4.0) + (homeERA || 4.0)) / 2;
-      if (pf >= 106 && avgERA >= 4.0) tip = '&#x1F525; Strong BTS game - hitter-friendly park + weak pitching';
-      else if (pf >= 103 && avgERA >= 3.75) tip = '&#x1F7E1; Good BTS spot - above average conditions';
-      else if (pf <= 94 || avgERA < 3.0) tip = '&#x1F976; Tough day - avoid unless you have a hot bat';
-      else tip = '&#x26AA; Average conditions - look for contact hitters';
-
-      games.push({
-        id: ev.id,
-        awayName: awayName, homeName: homeName,
-        awayAbbr: awayAbbr, homeAbbr: homeAbbr,
-        awayPitcher: awayPitcher, homePitcher: homePitcher,
-        awayERA: awayERA, homeERA: homeERA,
-        awayEraC: awayEraC, homeEraC: homeEraC,
-        pf: pf, venue: venue, gameTime: gameTime,
-        gameScore: gameScore, tip: tip,
-        status: (comp.status && comp.status.type && comp.status.type.description) || ''
-      });
-    } catch(e) {
-      // Skip this game if it fails to parse, but keep going
-      continue;
-    }
+  if (!picksData.pickCount) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No picks today</div><div class="err-sub">' + (picksData.message || 'No games scheduled') + '</div></div>';
+    document.getElementById('topFilter').style.display = 'none';
+    return;
   }
 
-  games.sort(function(a,b) { return b.gameScore - a.gameScore; });
-
-  var html = '';
-  if (!games.length) {
-    html = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No game data available</div><div class="err-sub">Got ' + events.length + ' events from ESPN but none could be parsed.</div></div>';
-  } else {
-    html = '<div class="ibox blu" style="margin-bottom:11px">' + games.length + ' games today, ranked best to worst for BTS. Green ERA = weak pitcher = easier to get a hit.</div>';
-    for (var gi = 0; gi < games.length; gi++) {
-      var g = games[gi];
-      var cls = gi === 0 ? 'gcard hot' : gi <= 2 ? 'gcard good' : 'gcard';
-      var scoreC = g.gameScore >= 55 ? 'ph' : g.gameScore >= 45 ? 'pm' : 'pl';
-      var awayEraDisp = g.awayERA != null ? g.awayERA.toFixed(2) : 'TBD';
-      var homeEraDisp = g.homeERA != null ? g.homeERA.toFixed(2) : 'TBD';
-      var pfC = g.pf >= 106 ? 'color:var(--grn)' : g.pf <= 94 ? 'color:var(--red)' : 'color:var(--fog)';
-
-      html += '<div class="' + cls + '">';
-      html += '<div class="ghdr"><div><div class="gteams">' + g.awayAbbr + ' @ ' + g.homeAbbr + '</div><div class="gtime">' + (g.gameTime || g.status) + (g.venue ? ' &middot; ' + g.venue : '') + '</div></div>';
-      html += '<div class="gscore-box"><div class="gscore ' + scoreC + '">' + g.gameScore + '</div><div class="gscore-l">BTS Score</div></div></div>';
-      html += '<div class="gbody">';
-      html += '<div class="gpitcher">';
-      html += '<div class="gpill away"><div class="gpill-lbl">' + g.awayAbbr + ' Pitcher</div><div class="gpill-name">' + g.awayPitcher + '</div><div class="gpill-era" style="' + g.awayEraC + '">ERA: ' + awayEraDisp + '</div></div>';
-      html += '<div class="gpill"><div class="gpill-lbl">' + g.homeAbbr + ' Pitcher</div><div class="gpill-name">' + g.homePitcher + '</div><div class="gpill-era" style="' + g.homeEraC + '">ERA: ' + homeEraDisp + '</div></div>';
-      html += '</div>';
-      html += '<div class="gstats">';
-      html += '<div class="gstat"><div class="gstat-v" style="' + pfC + '">' + g.pf + '</div><div class="gstat-l">Park Factor</div></div>';
-      html += '<div class="gstat"><div class="gstat-v" style="' + g.awayEraC + '">' + awayEraDisp + '</div><div class="gstat-l">Away ERA</div></div>';
-      html += '<div class="gstat"><div class="gstat-v" style="' + g.homeEraC + '">' + homeEraDisp + '</div><div class="gstat-l">Home ERA</div></div>';
-      html += '</div>';
-      html += '<div class="gtip">' + g.tip + '</div>';
-      html += '<div class="gbtn-row">';
-      html += '<div class="gbtn p1" data-game="' + g.id + '" data-team="' + g.awayName + '" data-num="1">&#x2B50; Pick ' + g.awayAbbr + ' batter (P1)</div>';
-      html += '<div class="gbtn p2" data-game="' + g.id + '" data-team="' + g.homeName + '" data-num="1">&#x2B50; Pick ' + g.homeAbbr + ' batter (P1)</div>';
-      html += '</div>';
-      html += '</div></div>';
-    }
+  // Build filter: All + each game
+  var fr = document.getElementById('topFilter');
+  fr.style.display = 'flex';
+  var fhtml = '<div class="fbtn ' + (activeFilter === 'all' ? 'on' : '') + '" data-f="all">All Games</div>';
+  picksData.games.forEach(function(g) {
+    var key = g.awayAbbr + '@' + g.homeAbbr;
+    fhtml += '<div class="fbtn ' + (activeFilter === key ? 'on' : '') + '" data-f="' + key + '">' + g.awayAbbr + ' @ ' + g.homeAbbr + '</div>';
+  });
+  fr.innerHTML = fhtml;
+  // wire filter buttons
+  var fbtns = fr.querySelectorAll('.fbtn');
+  for (var i = 0; i < fbtns.length; i++) {
+    fbtns[i].addEventListener('click', function() {
+      activeFilter = this.getAttribute('data-f');
+      renderTop();
+    });
   }
 
-  document.getElementById('gameWrap').innerHTML = html;
+  // Filter picks
+  var filtered = picksData.picks;
+  if (activeFilter !== 'all') {
+    var parts = activeFilter.split('@');
+    var away = parts[0], home = parts[1];
+    filtered = picksData.picks.filter(function(p) {
+      return (p.team === away && p.oppTeam === home) || (p.team === home && p.oppTeam === away);
+    });
+  }
 
-  var btns = document.querySelectorAll('.gbtn');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].addEventListener('click', function() {
+  if (!filtered.length) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No picks for this filter</div></div>';
+    return;
+  }
+
+  // Header info
+  var html = '<div class="ibox blu" style="margin-bottom:11px">Top ' + filtered.length + ' batters ranked by hit probability. Tap &#x2B50; to set as Pick 1 or &#x1F4AA; for Pick 2. Data pulled live from MLB.</div>';
+
+  filtered.forEach(function(p, i) {
+    var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
+    var rank = i + 1;
+    var bvpHtml;
+    if (p.bvpAb > 0) {
+      bvpHtml = '<span class="pick-bvp-yes">BvP: ' + p.bvpHits + '-for-' + p.bvpAb + ' (.' + String(Math.round(p.bvpAvg*1000)).padStart(3,'0') + ')</span>';
+    } else {
+      bvpHtml = '<span class="pick-bvp-no">No BvP history</span>';
+    }
+    var loc = p.isHome ? '&#x1F3E0; HOME' : '&#x2708;&#xFE0F; AWAY';
+    var pfDisp = Math.round(p.parkFactor * 100);
+    var oppPitcher = p.opposingPitcher || 'TBD';
+    var pitcherERA = p.pitcherStats && p.pitcherStats.era ? p.pitcherStats.era.toFixed(2) : null;
+    var pitcherInfo = oppPitcher + (pitcherERA ? ' (' + pitcherERA + ' ERA)' : '');
+
+    // Escape quotes for data attributes
+    var nameEsc = String(p.name).replace(/"/g,'&quot;');
+    var teamEsc = String(p.team).replace(/"/g,'&quot;');
+
+    html += '<div class="' + cls + '">';
+    html += '<div class="pick-rank">' + rank + '</div>';
+    html += '<div class="pick-main">';
+    html += '<div class="pick-name">' + p.name + '</div>';
+    html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
+    html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + '</div>';
+    html += '</div>';
+    html += '<div>';
+    html += '<div class="pick-prob">' + p.hitProb + '%</div>';
+    html += '<div class="pick-prob-l">Hit Prob</div>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:3px">';
+    html += '<button class="pick-btn" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="1">P1</button>';
+    html += '<button class="pick-btn p2" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="2">P2</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  wrap.innerHTML = html;
+
+  // Wire pick buttons
+  var btns = wrap.querySelectorAll('.pick-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
       var team = this.getAttribute('data-team');
-      var num = parseInt(this.getAttribute('data-num') || '1');
-      picks[num-1] = {name: 'Pick from ' + team, prob: null, team: team};
+      var prob = parseInt(this.getAttribute('data-prob') || '0', 10);
+      var slot = parseInt(this.getAttribute('data-slot') || '1', 10);
+      picks[slot-1] = { name: name, team: team, prob: prob };
       ls.set('bts_picks', picks);
       renderStreak();
-      showToast('Pick ' + num + ' set: ' + team + ' batter', 'grn');
-      goTab('streak');
+      showToast('Pick ' + slot + ' set: ' + name, 'grn');
     });
   }
 }
 
+// ========== RENDER GAMES ==========
+function renderGames() {
+  if (!picksData) return;
+  var wrap = document.getElementById('gamesWrap');
+  if (!picksData.games.length) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No games today</div></div>';
+    return;
+  }
+
+  var html = '<div class="ibox blu" style="margin-bottom:11px">' + picksData.games.length + ' games today. Tap a game in the Top Picks tab to filter picks to just that game.</div>';
+  picksData.games.forEach(function(g, i) {
+    var cls = 'gcard';
+    var gt = '';
+    try { gt = new Date(g.gameTime).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); } catch(e) {}
+    html += '<div class="' + cls + '">';
+    html += '<div class="ghdr"><div><div class="gteams">' + g.awayAbbr + ' @ ' + g.homeAbbr + '</div><div class="gtime">' + gt + (g.venue ? ' &middot; ' + g.venue : '') + '</div></div></div>';
+    html += '<div class="gbody">';
+    html += '<div class="gpitcher">';
+    html += '<div class="gpill away"><div class="gpill-lbl">' + g.awayAbbr + ' PITCHER</div><div class="gpill-name">' + (g.awayPitcher || 'TBD') + '</div></div>';
+    html += '<div class="gpill"><div class="gpill-lbl">' + g.homeAbbr + ' PITCHER</div><div class="gpill-name">' + (g.homePitcher || 'TBD') + '</div></div>';
+    html += '</div>';
+    html += '</div></div>';
+  });
+  wrap.innerHTML = html;
+}
+
+// ========== PARKS/STREAK/HISTORY (unchanged) ==========
 function renderParks() {
   var sorted = PARKS.slice().sort(function(a,b) { return b.hit - a.hit; });
   document.getElementById('parkRows').innerHTML = sorted.map(function(p) {
@@ -527,35 +498,24 @@ function renderParks() {
     return '<div class="park-row"><div><div class="park-nm">' + p.name + '</div><div class="park-tm">' + p.team + '</div></div><div class="psc ' + hc + '">' + p.hit + '</div><div class="psc ' + hrc + '">' + p.hr + '</div><div style="text-align:center;font-size:14px">' + rat + '</div></div>';
   }).join('');
 }
-
 function clearPick(num) { picks[num-1]=null; ls.set('bts_picks',picks); renderStreak(); }
-function setManualPick(num) {
-  var name = document.getElementById('manPickName').value.trim();
-  var team = document.getElementById('manPickTeam').value.trim();
-  if (!name) { showToast('Enter a player name',''); return; }
-  picks[num-1] = {name:name, prob:null, team:team||'--'};
-  ls.set('bts_picks',picks); renderStreak();
-  showToast('Pick ' + num + ': ' + name, 'grn');
-  document.getElementById('manPickName').value='';
-  document.getElementById('manPickTeam').value='';
-}
 function renderStreak() {
   document.getElementById('streakNum').textContent = streak;
   document.getElementById('remain').textContent = Math.max(0, 57-streak);
-  document.getElementById('saveLbl').textContent = (streak>=10&&streak<=15) ? '&#x1F6E1; Streak Saver Active!' : '';
+  document.getElementById('saveLbl').textContent = (streak>=10&&streak<=15) ? '\uD83D\uDEE1 Streak Saver Active!' : '';
   var p1=picks[0], p2=picks[1];
   document.getElementById('p1name').textContent = p1 ? p1.name : '-- No pick --';
-  document.getElementById('p1det').textContent = p1 ? (p1.team || '--') + (p1.prob ? ' - ' + p1.prob + '% hit prob' : '') : 'Go to Today\'s Games tab';
+  document.getElementById('p1det').textContent = p1 ? (p1.team || '--') + (p1.prob ? ' - ' + p1.prob + '% hit prob' : '') : 'Go to Top Picks tab';
   document.getElementById('p1prob').textContent = p1&&p1.prob ? p1.prob+'%' : '--';
   document.getElementById('p2name').textContent = p2 ? p2.name : '-- Double down --';
-  document.getElementById('p2det').textContent = p2 ? (p2.team || '--') : 'Optional second pick';
+  document.getElementById('p2det').textContent = p2 ? (p2.team || '--') + (p2.prob ? ' - ' + p2.prob + '%' : '') : 'Optional second pick';
   document.getElementById('p2prob').textContent = p2&&p2.prob ? p2.prob+'%' : '--';
 }
 function recordResult(result) {
   if (!picks[0]) { showToast('Select a pick first',''); return; }
   var entry = {date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), player:picks[0].name, player2:picks[1]&&picks[1].name, result:result, streakBefore:streak};
-  if (result==='hit') { streak += picks[1]?2:1; showToast('&#x1F525; Hit! Streak: '+streak,'grn'); }
-  else { streak=0; showToast('&#x274C; No hit. Streak reset.','red'); }
+  if (result==='hit') { streak += picks[1]?2:1; showToast('Hit! Streak: '+streak,'grn'); }
+  else { streak=0; showToast('No hit. Streak reset.','red'); }
   btsHist.unshift(entry);
   if (btsHist.length>30) btsHist=btsHist.slice(0,30);
   picks=[null,null];
@@ -582,9 +542,11 @@ function renderHistory() {
   }).join('');
 }
 function goTab(n) {
-  ['picks','parks','streak','guide'].forEach(function(t) {
-    document.getElementById('s-'+t).className = 'screen'+(t===n?' on':'');
-    document.getElementById('t-'+t).className = 'tab'+(t===n?' on':'');
+  ['top','games','parks','streak','guide'].forEach(function(t) {
+    var s = document.getElementById('s-'+t);
+    var tb = document.getElementById('t-'+t);
+    if (s) s.className = 'screen'+(t===n?' on':'');
+    if (tb) tb.className = 'tab'+(t===n?' on':'');
   });
 }
 function showToast(msg, type) {
@@ -597,6 +559,5 @@ function showToast(msg, type) {
 
 init();
 </script>
-
 </body>
 </html>
