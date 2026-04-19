@@ -135,7 +135,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v4 debug</div>
+<div class="ver-tag">v5 fixed</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -293,7 +293,7 @@ var ls = {
 };
 
 var streak = ls.get('bts_streak') || 0;
-var history = ls.get('bts_history') || [];
+var btsHist = ls.get('bts_history') || [];
 var picks = ls.get('bts_picks') || [null,null];
 
 function init() {
@@ -556,15 +556,15 @@ function recordResult(result) {
   var entry = {date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}), player:picks[0].name, player2:picks[1]&&picks[1].name, result:result, streakBefore:streak};
   if (result==='hit') { streak += picks[1]?2:1; showToast('&#x1F525; Hit! Streak: '+streak,'grn'); }
   else { streak=0; showToast('&#x274C; No hit. Streak reset.','red'); }
-  history.unshift(entry);
-  if (history.length>30) history=history.slice(0,30);
+  btsHist.unshift(entry);
+  if (btsHist.length>30) btsHist=btsHist.slice(0,30);
   picks=[null,null];
-  ls.set('bts_streak',streak); ls.set('bts_history',history); ls.set('bts_picks',picks);
+  ls.set('bts_streak',streak); ls.set('bts_history',btsHist); ls.set('bts_picks',picks);
   renderStreak(); renderHistory();
 }
 function resetStreak() { if (!confirm('Reset streak to 0?')) return; streak=0; ls.set('bts_streak',0); renderStreak(); showToast('Streak reset'); }
 function updateAccuracy() {
-  var total=history.length, hits=history.filter(function(h){return h.result==='hit';}).length, misses=total-hits;
+  var total=btsHist.length, hits=btsHist.filter(function(h){return h.result==='hit';}).length, misses=total-hits;
   var pct=total>0?Math.round((hits/total)*100):null;
   document.getElementById('accTotal').textContent=total;
   document.getElementById('accHits').textContent=hits;
@@ -576,8 +576,8 @@ function updateAccuracy() {
 function renderHistory() {
   updateAccuracy();
   var el=document.getElementById('histList');
-  if (!history.length) { el.innerHTML='<div style="padding:13px;text-align:center;color:var(--fog);font-size:11px">No results yet</div>'; return; }
-  el.innerHTML=history.slice(0,20).map(function(h) {
+  if (!btsHist.length) { el.innerHTML='<div style="padding:13px;text-align:center;color:var(--fog);font-size:11px">No results yet</div>'; return; }
+  el.innerHTML=btsHist.slice(0,20).map(function(h) {
     return '<div class="hist-item"><div class="hist-dot '+(h.result==='hit'?'hit-dot':'miss-dot')+'"></div><div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h.player+(h.player2?' + '+h.player2:'')+'</div><div style="font-size:9px;color:var(--fog)">'+h.date+' &middot; Streak was '+h.streakBefore+'</div></div><div class="'+(h.result==='hit'?'hit-res':'miss-res')+'">'+(h.result==='hit'?'HIT':'MISS')+'</div></div>';
   }).join('');
 }
