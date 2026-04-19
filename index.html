@@ -144,7 +144,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v7 my players</div>
+<div class="ver-tag">v8 hr tab</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -155,6 +155,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </header>
 <div class="tabs">
   <div class="tab on" id="t-top">&#x1F3C6; Top Picks</div>
+  <div class="tab" id="t-hr">&#x1F4A5; Home Runs</div>
   <div class="tab" id="t-my">&#x2B50; My Players</div>
   <div class="tab" id="t-games">&#x1F3AF; Games</div>
   <div class="tab" id="t-parks">&#x1F3DF; Ballparks</div>
@@ -176,6 +177,21 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
       <div class="spin"></div>
       <div class="load-txt">Building today's picks...</div>
       <div class="load-sub">Pulling season stats + BvP from MLB — can take 30-60s</div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="s-hr">
+  <div class="live-bar">
+    <div class="live-txt"><div class="live-dot"></div>LIVE</div>
+    <div class="live-date" id="hrDate">Loading...</div>
+    <div class="refresh-btn" id="hrRefresh">&#x21BB;</div>
+  </div>
+  <div id="hrWrap">
+    <div class="loading">
+      <div class="spin"></div>
+      <div class="load-txt">Finding today's top HR candidates...</div>
+      <div class="load-sub">Power + park + pitcher HR/9</div>
     </div>
   </div>
 </div>
@@ -312,6 +328,7 @@ var picks = ls.get('bts_picks') || [null,null];
 // Data from the /api/picks backend
 var picksData = null;
 var myPlayersData = null;
+var hrData = null;
 var activeFilter = 'all';
 
 // ========== INIT ==========
@@ -319,6 +336,7 @@ function init() {
   var today = new Date();
   var dateStr = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   document.getElementById('topDate').textContent = dateStr;
+  document.getElementById('hrDate').textContent = dateStr;
   document.getElementById('myDate').textContent = dateStr;
   document.getElementById('gamesDate').textContent = dateStr;
   renderParks();
@@ -331,12 +349,14 @@ function init() {
 
 function wireButtons() {
   document.getElementById('t-top').addEventListener('click', function() { goTab('top'); });
+  document.getElementById('t-hr').addEventListener('click', function() { goTab('hr'); if (!hrData) loadHR(); });
   document.getElementById('t-my').addEventListener('click', function() { goTab('my'); if (!myPlayersData) loadMyPlayers(); });
   document.getElementById('t-games').addEventListener('click', function() { goTab('games'); if (!picksData) loadTopPicks(); else renderGames(); });
   document.getElementById('t-parks').addEventListener('click', function() { goTab('parks'); });
   document.getElementById('t-streak').addEventListener('click', function() { goTab('streak'); });
   document.getElementById('t-guide').addEventListener('click', function() { goTab('guide'); });
   document.getElementById('topRefresh').addEventListener('click', loadTopPicks);
+  document.getElementById('hrRefresh').addEventListener('click', loadHR);
   document.getElementById('myRefresh').addEventListener('click', loadMyPlayers);
   document.getElementById('gamesRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('clrPick1').addEventListener('click', function() { clearPick(1); });
@@ -508,6 +528,87 @@ function renderGames() {
   wrap.innerHTML = html;
 }
 
+// ========== HOME RUNS ==========
+function loadHR() {
+  document.getElementById('hrWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Finding today\'s top HR candidates...</div><div class="load-sub">Power + park + pitcher HR/9</div></div>';
+
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, 60000);
+
+  fetch('/api/homeruns', { signal: controller.signal })
+    .then(function(r) {
+      clearTimeout(timer);
+      if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); });
+      return r.json();
+    })
+    .then(function(data) {
+      if (!data.ok) throw new Error(data.error || 'Backend returned ok=false');
+      hrData = data;
+      renderHR();
+    })
+    .catch(function(err) {
+      clearTimeout(timer);
+      var msg = err.name === 'AbortError' ? 'Timed out after 60s.' : (err.message || String(err));
+      document.getElementById('hrWrap').innerHTML = '<div class="err-box"><div class="err-icon">&#x26A0;&#xFE0F;</div><div class="err-txt">Could not load HR picks</div><div class="err-detail">' + msg + '</div><button class="retry-btn" id="hrRetryBtn">&#x21BB; Retry</button></div>';
+      var b = document.getElementById('hrRetryBtn'); if (b) b.addEventListener('click', loadHR);
+    });
+}
+
+function renderHR() {
+  if (!hrData) return;
+  var wrap = document.getElementById('hrWrap');
+  var picks = hrData.picks || [];
+  if (!picks.length) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No HR candidates</div><div class="err-sub">' + (hrData.message || 'No games scheduled') + '</div></div>';
+    return;
+  }
+
+  var top30 = picks.slice(0, 30);
+  var html = '<div class="ibox gold" style="margin-bottom:11px"><strong>Top ' + top30.length + ' HR candidates.</strong> Based on season HR rate, park HR factor, and opposing pitcher\'s HR/9 allowed. Tap P1/P2 to set a pick.</div>';
+
+  top30.forEach(function(p, i) {
+    var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
+    var loc = p.isHome ? '&#x1F3E0; HOME' : '&#x2708;&#xFE0F; AWAY';
+    var parkDisp = Math.round(p.parkHRFactor * 100);
+    var pitcherHR = (p.pitcherHRper9 != null && p.pitcherHRper9 > 0) ? ' (' + p.pitcherHRper9.toFixed(2) + ' HR/9)' : '';
+    var pitcherInfo = p.opposingPitcher + pitcherHR;
+    var nameEsc = String(p.name).replace(/"/g,'&quot;');
+    var teamEsc = String(p.team).replace(/"/g,'&quot;');
+    var isoDisp = p.seasonIso ? '.' + String(Math.round(p.seasonIso*1000)).padStart(3,'0') : '---';
+    var rate = (p.hrRate * 100).toFixed(1);
+
+    html += '<div class="' + cls + '">';
+    html += '<div class="pick-rank">' + (i+1) + '</div>';
+    html += '<div class="pick-main">';
+    html += '<div class="pick-name">' + p.name + '</div>';
+    html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
+    html += '<div class="pick-stats">' + p.seasonHR + ' HR (' + rate + '% rate) &middot; ISO ' + isoDisp + ' &middot; Park HR ' + parkDisp + '</div>';
+    html += '</div>';
+    html += '<div><div class="pick-prob">' + p.hrProb + '%</div><div class="pick-prob-l">HR Prob</div></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:3px">';
+    html += '<button class="pick-btn" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hrProb + '" data-slot="1">P1</button>';
+    html += '<button class="pick-btn p2" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hrProb + '" data-slot="2">P2</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  wrap.innerHTML = html;
+
+  var btns = wrap.querySelectorAll('.pick-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
+      var team = this.getAttribute('data-team');
+      var prob = parseFloat(this.getAttribute('data-prob') || '0');
+      var slot = parseInt(this.getAttribute('data-slot') || '1', 10);
+      picks[slot-1] = { name: name, team: team, prob: Math.round(prob) };
+      ls.set('bts_picks', picks);
+      renderStreak();
+      showToast('Pick ' + slot + ' set: ' + name, 'grn');
+    });
+  }
+}
+
 // ========== MY PLAYERS ==========
 function loadMyPlayers() {
   document.getElementById('myWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Checking your players...</div><div class="load-sub">Looking up today\'s matchups</div></div>';
@@ -664,7 +765,7 @@ function renderHistory() {
   }).join('');
 }
 function goTab(n) {
-  ['top','my','games','parks','streak','guide'].forEach(function(t) {
+  ['top','hr','my','games','parks','streak','guide'].forEach(function(t) {
     var s = document.getElementById('s-'+t);
     var tb = document.getElementById('t-'+t);
     if (s) s.className = 'screen'+(t===n?' on':'');
