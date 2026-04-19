@@ -311,16 +311,25 @@ function wireButtons() {
   document.getElementById('manPick2').addEventListener('click', function() { setManualPick(2); });
 }
 
+function fetchWithTimeout(url, ms) {
+  return new Promise(function(resolve, reject) {
+    var timer = setTimeout(function() { reject(new Error('Request timed out after ' + (ms/1000) + 's')); }, ms);
+    fetch(url).then(function(r) { clearTimeout(timer); resolve(r); }).catch(function(e) { clearTimeout(timer); reject(e); });
+  });
+}
+
 function loadGames() {
   document.getElementById('gameWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Fetching today\'s games...</div><div class="load-sub">Connecting to ESPN</div></div>';
 
   var today = new Date();
   var dateStr = today.getFullYear() + '' + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
-  var url = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=' + dateStr + '&limit=20';
+  var espnUrl = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=' + dateStr + '&limit=20';
+  // CORS proxy - browsers block direct calls to ESPN from netlify, so we route through corsproxy.io
+  var url = 'https://corsproxy.io/?' + encodeURIComponent(espnUrl);
 
-  fetch(url)
+  fetchWithTimeout(url, 15000)
     .then(function(r) {
-      if (!r.ok) throw new Error('ESPN returned ' + r.status);
+      if (!r.ok) throw new Error('Proxy returned ' + r.status);
       return r.json();
     })
     .then(function(data) {
