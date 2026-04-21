@@ -144,7 +144,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v8 hr tab</div>
+<div class="ver-tag">v9 bvp leaders</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -155,6 +155,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </header>
 <div class="tabs">
   <div class="tab on" id="t-top">&#x1F3C6; Top Picks</div>
+  <div class="tab" id="t-bvp">&#x1F3AF; BvP</div>
   <div class="tab" id="t-hr">&#x1F4A5; Home Runs</div>
   <div class="tab" id="t-my">&#x2B50; My Players</div>
   <div class="tab" id="t-games">&#x1F3AF; Games</div>
@@ -192,6 +193,21 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
       <div class="spin"></div>
       <div class="load-txt">Finding today's top HR candidates...</div>
       <div class="load-sub">Power + park + pitcher HR/9</div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="s-bvp">
+  <div class="live-bar">
+    <div class="live-txt"><div class="live-dot"></div>LIVE</div>
+    <div class="live-date" id="bvpDate">Loading...</div>
+    <div class="refresh-btn" id="bvpRefresh">&#x21BB;</div>
+  </div>
+  <div id="bvpWrap">
+    <div class="loading">
+      <div class="spin"></div>
+      <div class="load-txt">Ranking batter vs pitcher matchups...</div>
+      <div class="load-sub">Historical BvP batting averages</div>
     </div>
   </div>
 </div>
@@ -337,6 +353,7 @@ function init() {
   var dateStr = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   document.getElementById('topDate').textContent = dateStr;
   document.getElementById('hrDate').textContent = dateStr;
+  document.getElementById('bvpDate').textContent = dateStr;
   document.getElementById('myDate').textContent = dateStr;
   document.getElementById('gamesDate').textContent = dateStr;
   renderParks();
@@ -350,6 +367,7 @@ function init() {
 function wireButtons() {
   document.getElementById('t-top').addEventListener('click', function() { goTab('top'); });
   document.getElementById('t-hr').addEventListener('click', function() { goTab('hr'); if (!hrData) loadHR(); });
+  document.getElementById('t-bvp').addEventListener('click', function() { goTab('bvp'); if (!picksData) loadTopPicks(); else renderBvP(); });
   document.getElementById('t-my').addEventListener('click', function() { goTab('my'); if (!myPlayersData) loadMyPlayers(); });
   document.getElementById('t-games').addEventListener('click', function() { goTab('games'); if (!picksData) loadTopPicks(); else renderGames(); });
   document.getElementById('t-parks').addEventListener('click', function() { goTab('parks'); });
@@ -357,6 +375,7 @@ function wireButtons() {
   document.getElementById('t-guide').addEventListener('click', function() { goTab('guide'); });
   document.getElementById('topRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('hrRefresh').addEventListener('click', loadHR);
+  document.getElementById('bvpRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('myRefresh').addEventListener('click', loadMyPlayers);
   document.getElementById('gamesRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('clrPick1').addEventListener('click', function() { clearPick(1); });
@@ -388,6 +407,7 @@ function loadTopPicks() {
       picksData = data;
       renderTop();
       renderGames();
+      renderBvP();
       showToast(data.pickCount + ' picks ready (' + Math.round(data.elapsedMs/1000) + 's)', 'grn');
     })
     .catch(function(err) {
@@ -487,6 +507,85 @@ function renderTop() {
   wrap.innerHTML = html;
 
   // Wire pick buttons
+  var btns = wrap.querySelectorAll('.pick-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
+      var team = this.getAttribute('data-team');
+      var prob = parseInt(this.getAttribute('data-prob') || '0', 10);
+      var slot = parseInt(this.getAttribute('data-slot') || '1', 10);
+      picks[slot-1] = { name: name, team: team, prob: prob };
+      ls.set('bts_picks', picks);
+      renderStreak();
+      showToast('Pick ' + slot + ' set: ' + name, 'grn');
+    });
+  }
+}
+
+// ========== RENDER BVP LEADERS ==========
+function renderBvP() {
+  if (!picksData) return;
+  var wrap = document.getElementById('bvpWrap');
+
+  if (!picksData.picks || !picksData.picks.length) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No picks today</div><div class="err-sub">' + (picksData.message || 'No games scheduled') + '</div></div>';
+    return;
+  }
+
+  // Filter to picks with meaningful BvP history (at least 5 ABs)
+  var bvpOnly = picksData.picks.filter(function(p) {
+    return p.bvpAb >= 5 && p.opposingPitcher && p.opposingPitcher !== 'TBD';
+  });
+
+  if (!bvpOnly.length) {
+    wrap.innerHTML = '<div class="ibox blu" style="margin-bottom:11px">No batters have 5+ career at-bats vs today\'s starting pitchers.</div>';
+    return;
+  }
+
+  // Sort by BvP average descending, then by BvP AB count as tiebreaker
+  bvpOnly.sort(function(a, b) {
+    if (b.bvpAvg !== a.bvpAvg) return b.bvpAvg - a.bvpAvg;
+    return b.bvpAb - a.bvpAb;
+  });
+
+  // Take top 30
+  var top = bvpOnly.slice(0, 30);
+
+  var html = '<div class="ibox blu" style="margin-bottom:11px">Top ' + top.length + ' batters sorted by career batting average vs today\'s starting pitcher (min 5 ABs). Tap &#x2B50; P1 / &#x1F4AA; P2 to save as a pick.</div>';
+
+  top.forEach(function(p, i) {
+    var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
+    var rank = i + 1;
+    var bvpAvgDisp = '.' + String(Math.round(p.bvpAvg*1000)).padStart(3,'0');
+    var seasonAvgDisp = '.' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0');
+    var loc = p.isHome ? '&#x1F3E0;' : '&#x2708;&#xFE0F;';
+    var oppPitcher = p.opposingPitcher || 'TBD';
+    var pitcherERA = p.pitcherStats && p.pitcherStats.era ? p.pitcherStats.era.toFixed(2) : null;
+    var pitcherInfo = oppPitcher + (pitcherERA ? ' (' + pitcherERA + ')' : '');
+
+    var nameEsc = String(p.name).replace(/"/g,'&quot;');
+    var teamEsc = String(p.team).replace(/"/g,'&quot;');
+
+    html += '<div class="' + cls + '">';
+    html += '<div class="pick-rank">' + rank + '</div>';
+    html += '<div class="pick-main">';
+    html += '<div class="pick-name">' + p.name + '</div>';
+    html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
+    html += '<div class="pick-stats"><span class="pick-bvp-yes">BvP: ' + p.bvpHits + '-for-' + p.bvpAb + ' (' + bvpAvgDisp + ')</span> &middot; Season ' + seasonAvgDisp + '</div>';
+    html += '</div>';
+    html += '<div>';
+    html += '<div class="pick-prob">' + bvpAvgDisp + '</div>';
+    html += '<div class="pick-prob-l">BvP AVG</div>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:3px">';
+    html += '<button class="pick-btn" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="1">P1</button>';
+    html += '<button class="pick-btn p2" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="2">P2</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  wrap.innerHTML = html;
+
   var btns = wrap.querySelectorAll('.pick-btn');
   for (var j = 0; j < btns.length; j++) {
     btns[j].addEventListener('click', function() {
@@ -765,7 +864,7 @@ function renderHistory() {
   }).join('');
 }
 function goTab(n) {
-  ['top','hr','my','games','parks','streak','guide'].forEach(function(t) {
+  ['top','hr','bvp','my','games','parks','streak','guide'].forEach(function(t) {
     var s = document.getElementById('s-'+t);
     var tb = document.getElementById('t-'+t);
     if (s) s.className = 'screen'+(t===n?' on':'');
