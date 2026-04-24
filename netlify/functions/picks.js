@@ -147,7 +147,7 @@ async function getTeamBattersWithStats(teamId, season) {
 async function getBvP(batterId, pitcherId) {
   const url = `${API}/people/${batterId}/stats?stats=vsPlayer&group=hitting&opposingPlayerId=${pitcherId}&sportId=1`;
   try {
-    const data = await fetchJson(url, 3500);
+    const data = await fetchJson(url, 2500);
     for (const s of (data.stats || [])) {
       if (s.type && (s.type.displayName === 'vsPlayerTotal' || s.type.displayName === 'vsPlayer')) {
         const splits = s.splits || [];
@@ -327,13 +327,14 @@ exports.handler = async function() {
       pitcherVsTeam[key] = pitcherVsTeamArr[i] || { starts:0, era:0, ip:0, er:0 };
     });
 
-    // For each team, pick top 10 by season AVG (min 20 ABs)
-    const teamTop10 = {};
+    // For each team, include ALL hitters with at least 5 season ABs (catches everyday players
+    // even when slumping, plus bench players who may have BvP history vs starter).
+    // Lower threshold than before (was 20) to catch slumping veterans and platoon bats.
+    const teamHitters = {};
     for (const tid of teamIdArr) {
-      teamTop10[tid] = (teamBatters[tid] || [])
-        .filter(b => b.ab >= 20)
-        .sort((a, b) => b.avg - a.avg)
-        .slice(0, 10);
+      teamHitters[tid] = (teamBatters[tid] || [])
+        .filter(b => b.ab >= 5)
+        .sort((a, b) => b.ab - a.ab); // sort by AB count (regulars first)
     }
 
     // Build list of BvP lookups needed (batter × opposing pitcher)
@@ -342,17 +343,17 @@ exports.handler = async function() {
       const parkFac = parkFactor(g.venue);
       const parkHit = parkHitFactor(g.venue);
       // Away batters vs home pitcher
-      (teamTop10[g.awayTeamId] || []).forEach(b => {
+      (teamHitters[g.awayTeamId] || []).forEach(b => {
         bvpTasks.push({ batter: b, pitcherId: g.homePitcherId, pitcherName: g.homePitcherName, teamAbbr: g.awayTeamAbbr, teamName: g.awayTeamName, teamId: g.awayTeamId, oppTeam: g.homeTeamAbbr, oppTeamId: g.homeTeamId, parkFac: parkFac, parkHit: parkHit, isHome: false, gamePk: g.gamePk, venue: g.venue });
       });
       // Home batters vs away pitcher
-      (teamTop10[g.homeTeamId] || []).forEach(b => {
+      (teamHitters[g.homeTeamId] || []).forEach(b => {
         bvpTasks.push({ batter: b, pitcherId: g.awayPitcherId, pitcherName: g.awayPitcherName, teamAbbr: g.homeTeamAbbr, teamName: g.homeTeamName, teamId: g.homeTeamId, oppTeam: g.awayTeamAbbr, oppTeamId: g.awayTeamId, parkFac: parkFac, parkHit: parkHit, isHome: true, gamePk: g.gamePk, venue: g.venue });
       });
     });
 
-    // Fetch BvP in parallel (batched)
-    const bvpResults = await mapLimit(bvpTasks, 15, async task => {
+    // Fetch BvP in parallel (batched). Higher concurrency since we're now checking full rosters.
+    const bvpResults = await mapLimit(bvpTasks, 30, async task => {
       if (!task.pitcherId) return { ab: 0, hits: 0, avg: 0 };
       return await getBvP(task.batter.personId, task.pitcherId);
     });
