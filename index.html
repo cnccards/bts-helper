@@ -144,7 +144,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v9 bvp leaders</div>
+<div class="ver-tag">v11 sharp signals</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -157,6 +157,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
   <div class="tab on" id="t-top">&#x1F3C6; Top Picks</div>
   <div class="tab" id="t-bvp">&#x1F3AF; BvP</div>
   <div class="tab" id="t-hr">&#x1F4A5; Home Runs</div>
+  <div class="tab" id="t-search">&#x1F50D; Search</div>
   <div class="tab" id="t-my">&#x2B50; My Players</div>
   <div class="tab" id="t-games">&#x1F3AF; Games</div>
   <div class="tab" id="t-parks">&#x1F3DF; Ballparks</div>
@@ -208,6 +209,53 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
       <div class="spin"></div>
       <div class="load-txt">Ranking batter vs pitcher matchups...</div>
       <div class="load-sub">Historical BvP batting averages</div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="s-search">
+  <div class="live-bar">
+    <div class="live-txt"><div class="live-dot"></div>LIVE</div>
+    <div class="live-date" id="searchDate">Loading...</div>
+    <div class="refresh-btn" id="searchRefresh">&#x21BB;</div>
+  </div>
+  <div class="ibox blu" style="margin-bottom:11px;font-size:11px"><strong>&#x1F50D; Smart filters</strong> &mdash; combine any filters to find the strongest hit candidates today.</div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Min season AVG</div>
+  <div class="filter-row" id="searchFilterAvg">
+    <div class="fbtn on" data-val="0">Any</div>
+    <div class="fbtn" data-val="0.270">.270+</div>
+    <div class="fbtn" data-val="0.290">.290+</div>
+    <div class="fbtn" data-val="0.310">.310+</div>
+    <div class="fbtn" data-val="0.330">.330+</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Matchup</div>
+  <div class="filter-row" id="searchFilterMatchup">
+    <div class="fbtn on" data-val="any">Any</div>
+    <div class="fbtn" data-val="platoon">Platoon Adv Only</div>
+    <div class="fbtn" data-val="lvr">LHB vs RHP</div>
+    <div class="fbtn" data-val="rvl">RHB vs LHP</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Park</div>
+  <div class="filter-row" id="searchFilterPark">
+    <div class="fbtn on" data-val="any">Any Park</div>
+    <div class="fbtn" data-val="hitters">Hitter&rsquo;s Parks Only</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Location</div>
+  <div class="filter-row" id="searchFilterLoc">
+    <div class="fbtn on" data-val="any">Home &amp; Away</div>
+    <div class="fbtn" data-val="home">Home Only</div>
+    <div class="fbtn" data-val="away">Away Only</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Pitcher Form</div>
+  <div class="filter-row" id="searchFilterPitcher">
+    <div class="fbtn on" data-val="any">Any</div>
+    <div class="fbtn" data-val="struggling">Pitcher Struggling &#x1F525;</div>
+    <div class="fbtn" data-val="owns">Pitcher Owns Team &#x1F9CA;</div>
+  </div>
+  <div id="searchWrap">
+    <div class="loading">
+      <div class="spin"></div>
+      <div class="load-txt">Loading today&rsquo;s picks...</div>
     </div>
   </div>
 </div>
@@ -354,6 +402,7 @@ function init() {
   document.getElementById('topDate').textContent = dateStr;
   document.getElementById('hrDate').textContent = dateStr;
   document.getElementById('bvpDate').textContent = dateStr;
+  document.getElementById('searchDate').textContent = dateStr;
   document.getElementById('myDate').textContent = dateStr;
   document.getElementById('gamesDate').textContent = dateStr;
   renderParks();
@@ -368,6 +417,7 @@ function wireButtons() {
   document.getElementById('t-top').addEventListener('click', function() { goTab('top'); });
   document.getElementById('t-hr').addEventListener('click', function() { goTab('hr'); if (!hrData) loadHR(); });
   document.getElementById('t-bvp').addEventListener('click', function() { goTab('bvp'); if (!picksData) loadTopPicks(); else renderBvP(); });
+  document.getElementById('t-search').addEventListener('click', function() { goTab('search'); if (!picksData) loadTopPicks(); else renderSearch(); });
   document.getElementById('t-my').addEventListener('click', function() { goTab('my'); if (!myPlayersData) loadMyPlayers(); });
   document.getElementById('t-games').addEventListener('click', function() { goTab('games'); if (!picksData) loadTopPicks(); else renderGames(); });
   document.getElementById('t-parks').addEventListener('click', function() { goTab('parks'); });
@@ -376,7 +426,23 @@ function wireButtons() {
   document.getElementById('topRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('hrRefresh').addEventListener('click', loadHR);
   document.getElementById('bvpRefresh').addEventListener('click', loadTopPicks);
+  document.getElementById('searchRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('myRefresh').addEventListener('click', loadMyPlayers);
+
+  // Search filter chips - single-select per group
+  ['searchFilterAvg','searchFilterMatchup','searchFilterPark','searchFilterLoc','searchFilterPitcher'].forEach(function(groupId) {
+    var group = document.getElementById(groupId);
+    if (!group) return;
+    var chips = group.querySelectorAll('.fbtn');
+    for (var ci = 0; ci < chips.length; ci++) {
+      chips[ci].addEventListener('click', function() {
+        var siblings = this.parentNode.querySelectorAll('.fbtn');
+        for (var si = 0; si < siblings.length; si++) siblings[si].classList.remove('on');
+        this.classList.add('on');
+        if (picksData) renderSearch();
+      });
+    }
+  });
   document.getElementById('gamesRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('clrPick1').addEventListener('click', function() { clearPick(1); });
   document.getElementById('clrPick2').addEventListener('click', function() { clearPick(2); });
@@ -408,6 +474,7 @@ function loadTopPicks() {
       renderTop();
       renderGames();
       renderBvP();
+      renderSearch();
       showToast(data.pickCount + ' picks ready (' + Math.round(data.elapsedMs/1000) + 's)', 'grn');
     })
     .catch(function(err) {
@@ -492,6 +559,27 @@ function renderTop() {
     html += '<div class="pick-name">' + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
     html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + '</div>';
+
+    // v11: add signal badges (platoon adv, pitcher form, hitter's park)
+    var tBadges = [];
+    if (p.platoonAdvantage) tBadges.push('<span style="color:var(--grn);font-weight:700">&#x26A1; platoon</span>');
+    var tPStat = p.pitcherStats;
+    var tPL3 = p.pitcherLast3;
+    if (tPStat && tPL3 && tPL3.starts >= 2 && tPStat.era > 0) {
+      if (tPL3.era > tPStat.era * 1.5) {
+        tBadges.push('<span style="color:var(--red);font-weight:700">&#x1F525; P struggling</span>');
+      }
+    }
+    var tPVT = p.pitcherVsTeam;
+    if (tPVT && tPVT.starts >= 2 && tPVT.era >= 5.00) {
+      tBadges.push('<span style="color:var(--red);font-weight:700">&#x1F4A5; owns P</span>');
+    }
+    var tPhf = p.parkHitFactor || 1.0;
+    if (tPhf >= 1.05) tBadges.push('<span style="color:var(--gold);font-weight:700">&#x1F3DF;&#xFE0F; hitter park</span>');
+    if (tBadges.length) {
+      html += '<div class="pick-stats" style="margin-top:3px">' + tBadges.join(' &middot; ') + '</div>';
+    }
+
     html += '</div>';
     html += '<div>';
     html += '<div class="pick-prob">' + p.hitProb + '%</div>';
@@ -507,6 +595,176 @@ function renderTop() {
   wrap.innerHTML = html;
 
   // Wire pick buttons
+  var btns = wrap.querySelectorAll('.pick-btn');
+  for (var j = 0; j < btns.length; j++) {
+    btns[j].addEventListener('click', function() {
+      var name = this.getAttribute('data-name');
+      var team = this.getAttribute('data-team');
+      var prob = parseInt(this.getAttribute('data-prob') || '0', 10);
+      var slot = parseInt(this.getAttribute('data-slot') || '1', 10);
+      picks[slot-1] = { name: name, team: team, prob: prob };
+      ls.set('bts_picks', picks);
+      renderStreak();
+      showToast('Pick ' + slot + ' set: ' + name, 'grn');
+    });
+  }
+}
+
+// ========== RENDER SEARCH ==========
+function getFilterVal(groupId) {
+  var group = document.getElementById(groupId);
+  if (!group) return null;
+  var on = group.querySelector('.fbtn.on');
+  return on ? on.getAttribute('data-val') : null;
+}
+
+function renderSearch() {
+  if (!picksData) return;
+  var wrap = document.getElementById('searchWrap');
+
+  if (!picksData.picks || !picksData.picks.length) {
+    wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No picks today</div><div class="err-sub">' + (picksData.message || 'No games scheduled') + '</div></div>';
+    return;
+  }
+
+  // Read filter values
+  var minAvg = parseFloat(getFilterVal('searchFilterAvg') || '0');
+  var matchup = getFilterVal('searchFilterMatchup') || 'any';
+  var park = getFilterVal('searchFilterPark') || 'any';
+  var loc = getFilterVal('searchFilterLoc') || 'any';
+  var pitchForm = getFilterVal('searchFilterPitcher') || 'any';
+
+  // Apply filters
+  var filtered = picksData.picks.filter(function(p) {
+    // Min season AVG
+    if (minAvg > 0 && p.seasonAvg < minAvg) return false;
+
+    // Matchup filter
+    var bs = p.batSide || 'R';
+    var ph = p.pitcherHand || 'R';
+    if (matchup === 'platoon') {
+      // Platoon advantage: LHB vs RHP, RHB vs LHP, or switch hitter
+      if (!p.platoonAdvantage) return false;
+    } else if (matchup === 'lvr') {
+      if (bs !== 'L' || ph !== 'R') return false;
+    } else if (matchup === 'rvl') {
+      if (bs !== 'R' || ph !== 'L') return false;
+    }
+
+    // Park filter — hitter's parks = parkHitFactor >= 1.02
+    if (park === 'hitters') {
+      var phf = p.parkHitFactor || 1.0;
+      if (phf < 1.02) return false;
+    }
+
+    // Home/away filter
+    if (loc === 'home' && !p.isHome) return false;
+    if (loc === 'away' && p.isHome) return false;
+
+    // Pitcher form filter
+    if (pitchForm === 'struggling') {
+      // Pitcher struggling: last3 ERA > season ERA × 1.5 AND last3 has 2+ starts
+      var pStat = p.pitcherStats;
+      var pL3 = p.pitcherLast3;
+      if (!pStat || !pL3 || pL3.starts < 2 || !pStat.era) return false;
+      if (pL3.era <= pStat.era * 1.5) return false;
+    } else if (pitchForm === 'owns') {
+      // Pitcher owns team: 2+ starts vs this team, ERA under 3.50
+      var pvt = p.pitcherVsTeam;
+      if (!pvt || pvt.starts < 2 || pvt.era > 3.50 || pvt.era === 0) return false;
+      // Actually flip: we want cards where pitcher DOESN'T own the team (team has hit them well)
+      // "Pitcher Owns Team" chip should show cards where that's true → this is bad for BATTER
+      // Reframe: this chip should show batters whose team has a HIGH ERA vs this pitcher (hitters advantage)
+      // Actually flip logic: show cards where pitcher struggles vs this team (ERA >= 5.00)
+      if (pvt.era < 5.00) return false;
+    }
+
+    return true;
+  });
+
+  // Sort by hit probability desc
+  filtered.sort(function(a, b) { return b.hitProb - a.hitProb; });
+
+  // Cap at top 50
+  var top = filtered.slice(0, 50);
+
+  if (!top.length) {
+    wrap.innerHTML = '<div class="ibox" style="margin-top:11px;text-align:center;padding:20px"><strong>No matches</strong><br><span style="color:var(--fog);font-size:11px">Try loosening your filters.</span></div>';
+    return;
+  }
+
+  var html = '<div class="ibox" style="margin-bottom:11px;font-size:11px"><strong>' + top.length + '</strong> match' + (top.length === 1 ? '' : 'es') + ' &mdash; sorted by hit probability.</div>';
+
+  top.forEach(function(p, i) {
+    var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
+    var rank = i + 1;
+    var seasonAvgDisp = '.' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0');
+    var hitProbDisp = p.hitProb + '%';
+    var locIcon = p.isHome ? '&#x1F3E0;' : '&#x2708;&#xFE0F;';
+    var oppPitcher = p.opposingPitcher || 'TBD';
+
+    // Build indicators
+    var badges = [];
+    if (p.platoonAdvantage) badges.push('<span class="pick-bvp-yes">PLATOON &#x26A1;</span>');
+
+    var pStat = p.pitcherStats;
+    var pL3 = p.pitcherLast3;
+    if (pStat && pL3 && pL3.starts >= 2 && pStat.era > 0) {
+      if (pL3.era > pStat.era * 1.5) {
+        badges.push('<span style="color:var(--red);font-weight:700">&#x1F525; P struggling</span>');
+      } else if (pL3.era < pStat.era * 0.7) {
+        badges.push('<span style="color:var(--blu);font-weight:700">&#x2744;&#xFE0F; P hot</span>');
+      }
+    }
+
+    var pvt = p.pitcherVsTeam;
+    if (pvt && pvt.starts >= 2) {
+      if (pvt.era >= 5.00) {
+        badges.push('<span style="color:var(--red);font-weight:700">&#x1F4A5; owns P</span>');
+      } else if (pvt.era < 2.50 && pvt.era > 0) {
+        badges.push('<span style="color:var(--fog);font-weight:700">&#x1F9CA; fade</span>');
+      }
+    }
+
+    var phf = p.parkHitFactor || 1.0;
+    if (phf >= 1.05) badges.push('<span style="color:var(--gold);font-weight:700">&#x1F3DF;&#xFE0F; hitter\'s park</span>');
+
+    var badgeStr = badges.length ? '<div class="pick-stats" style="margin-top:3px">' + badges.join(' &middot; ') + '</div>' : '';
+
+    // BvP line
+    var bvpLine = '';
+    if (p.bvpAb >= 5) {
+      var bvpAvgDisp = '.' + String(Math.round(p.bvpAvg*1000)).padStart(3,'0');
+      bvpLine = ' &middot; BvP ' + p.bvpHits + '/' + p.bvpAb + ' (' + bvpAvgDisp + ')';
+    }
+
+    // Handedness display
+    var handDisp = (p.batSide || 'R') + 'HB vs ' + (p.pitcherHand || 'R') + 'HP';
+
+    var nameEsc = String(p.name).replace(/"/g,'&quot;');
+    var teamEsc = String(p.team).replace(/"/g,'&quot;');
+
+    html += '<div class="' + cls + '">';
+    html += '<div class="pick-rank">' + rank + '</div>';
+    html += '<div class="pick-main">';
+    html += '<div class="pick-name">' + p.name + '</div>';
+    html += '<div class="pick-vs">' + p.team + ' ' + locIcon + ' vs ' + oppPitcher + ' &middot; ' + handDisp + '</div>';
+    html += '<div class="pick-stats">Season ' + seasonAvgDisp + bvpLine + '</div>';
+    html += badgeStr;
+    html += '</div>';
+    html += '<div>';
+    html += '<div class="pick-prob">' + hitProbDisp + '</div>';
+    html += '<div class="pick-prob-l">HIT %</div>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:3px">';
+    html += '<button class="pick-btn" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="1">P1</button>';
+    html += '<button class="pick-btn p2" data-name="' + nameEsc + '" data-team="' + teamEsc + '" data-prob="' + p.hitProb + '" data-slot="2">P2</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  wrap.innerHTML = html;
+
   var btns = wrap.querySelectorAll('.pick-btn');
   for (var j = 0; j < btns.length; j++) {
     btns[j].addEventListener('click', function() {
@@ -572,6 +830,27 @@ function renderBvP() {
     html += '<div class="pick-name">' + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
     html += '<div class="pick-stats"><span class="pick-bvp-yes">BvP: ' + p.bvpHits + '-for-' + p.bvpAb + ' (' + bvpAvgDisp + ')</span> &middot; Season ' + seasonAvgDisp + '</div>';
+
+    // Pitcher form + vs-team line (new in v11)
+    var pL3 = p.pitcherLast3;
+    var pVT = p.pitcherVsTeam;
+    var formParts = [];
+    if (pL3 && pL3.starts > 0) {
+      var formIcon = '';
+      if (p.pitcherStats && p.pitcherStats.era > 0) {
+        if (pL3.era > p.pitcherStats.era * 1.5) formIcon = ' &#x1F525;';
+        else if (pL3.era < p.pitcherStats.era * 0.7) formIcon = ' &#x2744;&#xFE0F;';
+      }
+      formParts.push('L3: ' + pL3.era.toFixed(2) + ' ERA' + formIcon);
+    }
+    if (pVT && pVT.starts >= 1) {
+      var vtIcon = pVT.era >= 5.00 ? ' &#x1F4A5;' : (pVT.era > 0 && pVT.era < 2.50 ? ' &#x1F9CA;' : '');
+      formParts.push('vs ' + p.team + ': ' + pVT.era.toFixed(2) + ' (' + pVT.starts + ')' + vtIcon);
+    }
+    if (formParts.length) {
+      html += '<div class="pick-stats" style="margin-top:2px;color:var(--fog);font-size:10px">' + formParts.join(' &middot; ') + '</div>';
+    }
+
     html += '</div>';
     html += '<div>';
     html += '<div class="pick-prob">' + bvpAvgDisp + '</div>';
@@ -864,7 +1143,7 @@ function renderHistory() {
   }).join('');
 }
 function goTab(n) {
-  ['top','hr','bvp','my','games','parks','streak','guide'].forEach(function(t) {
+  ['top','hr','bvp','search','my','games','parks','streak','guide'].forEach(function(t) {
     var s = document.getElementById('s-'+t);
     var tb = document.getElementById('t-'+t);
     if (s) s.className = 'screen'+(t===n?' on':'');
