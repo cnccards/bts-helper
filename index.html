@@ -144,7 +144,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v11 sharp signals</div>
+<div class="ver-tag">v12 full coverage</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -790,13 +790,13 @@ function renderBvP() {
     return;
   }
 
-  // Filter to picks with meaningful BvP history (at least 5 ABs)
+  // Filter to picks with meaningful BvP history (at least 3 ABs - lowered from 5 for max coverage)
   var bvpOnly = picksData.picks.filter(function(p) {
-    return p.bvpAb >= 5 && p.opposingPitcher && p.opposingPitcher !== 'TBD';
+    return p.bvpAb >= 3 && p.opposingPitcher && p.opposingPitcher !== 'TBD';
   });
 
   if (!bvpOnly.length) {
-    wrap.innerHTML = '<div class="ibox blu" style="margin-bottom:11px">No batters have 5+ career at-bats vs today\'s starting pitchers.</div>';
+    wrap.innerHTML = '<div class="ibox blu" style="margin-bottom:11px">No batters have 3+ career at-bats vs today\'s starting pitchers.</div>';
     return;
   }
 
