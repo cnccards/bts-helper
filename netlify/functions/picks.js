@@ -145,22 +145,24 @@ async function getTeamBattersWithStats(teamId, season) {
 }
 
 async function getBvP(batterId, pitcherId) {
-  const url = `${API}/people/${batterId}/stats?stats=vsPlayer&group=hitting&opposingPlayerId=${pitcherId}&sportId=1`;
+  // Use vsPlayerTotal which returns career-aggregate (no season param needed)
+  // Sum ALL splits to get true career totals; recalculate avg from raw counts
+  const url = `${API}/people/${batterId}/stats?stats=vsPlayerTotal&group=hitting&opposingPlayerId=${pitcherId}&sportId=1`;
   try {
     const data = await fetchJson(url, 2500);
+    let totalAb = 0, totalHits = 0;
     for (const s of (data.stats || [])) {
-      if (s.type && (s.type.displayName === 'vsPlayerTotal' || s.type.displayName === 'vsPlayer')) {
-        const splits = s.splits || [];
-        if (splits.length && splits[0].stat) {
-          const stat = splits[0].stat;
-          return {
-            ab: parseInt(stat.atBats || '0', 10) || 0,
-            hits: parseInt(stat.hits || '0', 10) || 0,
-            avg: parseFloat(stat.avg || '0') || 0
-          };
+      if (s.type && s.type.displayName === 'vsPlayerTotal') {
+        for (const split of (s.splits || [])) {
+          if (split.stat) {
+            totalAb += parseInt(split.stat.atBats || '0', 10) || 0;
+            totalHits += parseInt(split.stat.hits || '0', 10) || 0;
+          }
         }
       }
     }
+    const avg = totalAb > 0 ? totalHits / totalAb : 0;
+    return { ab: totalAb, hits: totalHits, avg: avg };
   } catch (e) {}
   return { ab: 0, hits: 0, avg: 0 };
 }
