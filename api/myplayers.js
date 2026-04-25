@@ -351,7 +351,19 @@ _internalHandler = async function() {
 };
 
 
-export async function onRequest(context) {
-  const result = await _internalHandler();
-  return new Response(result.body, { status: result.statusCode || 200, headers: result.headers || { "Content-Type": "application/json" } });
+export default async function handler(req, res) {
+  try {
+    const result = await _internalHandler();
+    const statusCode = result.statusCode || 200;
+    const headers = result.headers || { 'Content-Type': 'application/json' };
+    
+    // Set headers
+    for (const [key, value] of Object.entries(headers)) {
+      res.setHeader(key, value);
+    }
+    
+    res.status(statusCode).send(result.body);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message || String(e) });
+  }
 }
