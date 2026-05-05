@@ -1,11 +1,6 @@
 var _internalHandler;
 // netlify/functions/picks.js
-// Ranked BTS picks for today, pulled live from MLB Stats API
-// Optimized for 10s Netlify function timeout:
-//  - 1 schedule call
-//  - 1 call per team for roster+stats (hydrated)
-//  - Parallel BvP calls for only the top 10 batters per team
-//  - Parallel pitcher season stats
+// v14: + lineup status (batting order, confirmed) + recent form (last 15 games)
 
 const API = 'https://statsapi.mlb.com/api/v1';
 
@@ -23,7 +18,6 @@ const PARK_FACTORS = {
   'loanDepot park':0.94,'Chase Field':1.00,'George M. Steinbrenner Field':0.98
 };
 
-// Hit-specific park factors (different from runs - some parks boost HRs but not hits)
 const PARK_HIT_FACTORS = {
   'Coors Field':1.12,'Fenway Park':1.08,'Wrigley Field':1.04,
   'Great American Ball Park':1.03,'Citizens Bank Park':1.02,'Dodger Stadium':1.01,
@@ -101,7 +95,6 @@ async function getTodaysGames() {
   return games;
 }
 
-// ONE CALL to get roster + each player's season hitting stats in a single response
 async function getTeamBattersWithStats(teamId, season) {
   const url = `${API}/teams/${teamId}/roster?rosterType=active&hydrate=person(stats(type=season,group=hitting,season=${season}),batSide)`;
   try {
@@ -109,9 +102,8 @@ async function getTeamBattersWithStats(teamId, season) {
     const roster = data.roster || [];
     const result = [];
     for (const p of roster) {
-      if (!p.position || p.position.code === '1') continue; // exclude pitchers
+      if (!p.position || p.position.code === '1') continue;
       const person = p.person || {};
-      // Find season hitting split
       let avg = 0, ab = 0, hits = 0, ops = 0;
       const ps = (person.stats || []);
       for (const block of ps) {
@@ -126,10 +118,9 @@ async function getTeamBattersWithStats(teamId, season) {
           }
         }
       }
-      // Get batter handedness (L/R/S)
       var batSide = 'R';
       if (person.batSide && person.batSide.code) {
-        batSide = person.batSide.code; // 'L', 'R', or 'S' (switch)
+        batSide = person.batSide.code;
       }
       result.push({
         personId: person.id,
@@ -146,8 +137,6 @@ async function getTeamBattersWithStats(teamId, season) {
 }
 
 async function getBvP(batterId, pitcherId) {
-  // Use vsPlayerTotal which returns career-aggregate (no season param needed)
-  // Sum ALL splits to get true career totals; recalculate avg from raw counts
   const url = `${API}/people/${batterId}/stats?stats=vsPlayerTotal&group=hitting&opposingPlayerId=${pitcherId}&sportId=1`;
   try {
     const data = await fetchJson(url, 2500);
@@ -169,7 +158,6 @@ async function getBvP(batterId, pitcherId) {
 }
 
 async function getPitcherStats(pitcherId, season) {
-  // Use hydrate to grab pitch hand + season stats in one call
   const url = `${API}/people/${pitcherId}?hydrate=stats(group=pitching,type=season,season=${season})`;
   try {
     const data = await fetchJson(url, 3500);
@@ -189,14 +177,13 @@ async function getPitcherStats(pitcherId, season) {
     }
     var pitchHand = 'R';
     if (person.pitchHand && person.pitchHand.code) {
-      pitchHand = person.pitchHand.code; // 'L' or 'R'
+      pitchHand = person.pitchHand.code;
     }
     return { era: era, whip: whip, baa: baa, pitchHand: pitchHand };
   } catch (e) {}
   return { era: 0, whip: 0, baa: 0, pitchHand: 'R' };
 }
 
-// Get pitcher's last 3 starts — rolling form indicator
 async function getPitcherLast3(pitcherId, season) {
   const url = `${API}/people/${pitcherId}/stats?stats=gameLog&group=pitching&season=${season}`;
   try {
@@ -204,18 +191,15 @@ async function getPitcherLast3(pitcherId, season) {
     for (const s of (data.stats || [])) {
       const splits = s.splits || [];
       if (!splits.length) continue;
-      // Filter to starts only (gamesStarted=1), take last 3
       const starts = splits.filter(sp => sp.stat && parseInt(sp.stat.gamesStarted || '0', 10) >= 1);
-      // splits are oldest first typically; take last 3
       const last3 = starts.slice(-3);
       if (!last3.length) return { starts: 0, era: 0, ip: 0, er: 0 };
       let totalOuts = 0, totalER = 0;
       for (const sp of last3) {
-        // ip comes as decimal like "6.1" meaning 6+1/3 innings -> 19 outs
         const ipStr = sp.stat.inningsPitched || '0';
         const ipParts = String(ipStr).split('.');
         const wholeIp = parseInt(ipParts[0] || '0', 10);
-        const fracOuts = parseInt(ipParts[1] || '0', 10); // 0, 1, or 2
+        const fracOuts = parseInt(ipParts[1] || '0', 10);
         totalOuts += wholeIp * 3 + fracOuts;
         totalER += parseInt(sp.stat.earnedRuns || '0', 10);
       }
@@ -227,7 +211,6 @@ async function getPitcherLast3(pitcherId, season) {
   return { starts: 0, era: 0, ip: 0, er: 0 };
 }
 
-// Get pitcher's splits vs a specific team this season
 async function getPitcherVsTeam(pitcherId, opposingTeamId, season) {
   if (!pitcherId || !opposingTeamId) return { starts: 0, era: 0, ip: 0, er: 0 };
   const url = `${API}/people/${pitcherId}/stats?stats=vsTeam&group=pitching&opposingTeamId=${opposingTeamId}&season=${season}`;
@@ -254,7 +237,52 @@ async function getPitcherVsTeam(pitcherId, opposingTeamId, season) {
   return { starts: 0, era: 0, ip: 0, er: 0 };
 }
 
-// Bounded parallel helper
+// v14 NEW: Get batter's last 15 games rolling AVG
+async function getBatterRecentForm(batterId, season) {
+  const url = `${API}/people/${batterId}/stats?stats=gameLog&group=hitting&season=${season}`;
+  try {
+    const data = await fetchJson(url, 2500);
+    for (const s of (data.stats || [])) {
+      const splits = s.splits || [];
+      if (!splits.length) continue;
+      // gameLog returns oldest -> newest. Take last 15 games.
+      const last15 = splits.slice(-15);
+      let totalAb = 0, totalHits = 0;
+      for (const sp of last15) {
+        if (!sp.stat) continue;
+        totalAb += parseInt(sp.stat.atBats || '0', 10) || 0;
+        totalHits += parseInt(sp.stat.hits || '0', 10) || 0;
+      }
+      const avg = totalAb > 0 ? totalHits / totalAb : 0;
+      return { games: last15.length, ab: totalAb, hits: totalHits, avg: avg };
+    }
+  } catch (e) {}
+  return { games: 0, ab: 0, hits: 0, avg: 0 };
+}
+
+// v14 NEW: Get today's lineup for a team (returns map of personId -> battingOrder)
+// Returns null if lineup not yet posted (so we can flag "unconfirmed")
+async function getTeamLineup(gamePk, teamSide) {
+  // teamSide is 'home' or 'away'
+  const url = `${API}/game/${gamePk}/boxscore`;
+  try {
+    const data = await fetchJson(url, 2500);
+    const teams = data.teams || {};
+    const t = teams[teamSide];
+    if (!t || !t.battingOrder || !t.battingOrder.length) {
+      return null; // lineup not posted yet
+    }
+    // battingOrder is array of personIds in batting order positions
+    // First 9 are starters in order 1-9
+    const lineup = {};
+    t.battingOrder.slice(0, 9).forEach((pid, idx) => {
+      lineup[pid] = idx + 1; // 1 through 9
+    });
+    return lineup;
+  } catch (e) {}
+  return null;
+}
+
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
   let i = 0;
@@ -285,7 +313,6 @@ _internalHandler = async function() {
       };
     }
 
-    // Collect unique team IDs and pitcher IDs
     const teamIds = new Set();
     const pitcherIds = new Set();
     games.forEach(g => {
@@ -295,11 +322,9 @@ _internalHandler = async function() {
       if (g.homePitcherId) pitcherIds.add(g.homePitcherId);
     });
 
-    // Parallel: teams rosters (with hydrated season stats) + pitcher stats
     const teamIdArr = Array.from(teamIds);
     const pitcherIdArr = Array.from(pitcherIds);
 
-    // Build pitcher-vs-team pairs (each pitcher has one opposing team today)
     const pitcherVsTeamPairs = [];
     games.forEach(g => {
       if (g.awayPitcherId && g.homeTeamId) {
@@ -310,14 +335,21 @@ _internalHandler = async function() {
       }
     });
 
-    const [teamBattersArrays, pitcherStatsArr, pitcherLast3Arr, pitcherVsTeamArr] = await Promise.all([
+    // v14: also fetch lineups (one per game-side)
+    const lineupTasks = [];
+    games.forEach(g => {
+      lineupTasks.push({ gamePk: g.gamePk, teamSide: 'home', teamId: g.homeTeamId });
+      lineupTasks.push({ gamePk: g.gamePk, teamSide: 'away', teamId: g.awayTeamId });
+    });
+
+    const [teamBattersArrays, pitcherStatsArr, pitcherLast3Arr, pitcherVsTeamArr, lineupArr] = await Promise.all([
       mapLimit(teamIdArr, 10, id => getTeamBattersWithStats(id, season)),
       mapLimit(pitcherIdArr, 10, id => getPitcherStats(id, season)),
       mapLimit(pitcherIdArr, 10, id => getPitcherLast3(id, season)),
-      mapLimit(pitcherVsTeamPairs, 10, pair => getPitcherVsTeam(pair.pitcherId, pair.teamId, season))
+      mapLimit(pitcherVsTeamPairs, 10, pair => getPitcherVsTeam(pair.pitcherId, pair.teamId, season)),
+      mapLimit(lineupTasks, 15, t => getTeamLineup(t.gamePk, t.teamSide))
     ]);
 
-    // Index
     const teamBatters = {};
     teamIdArr.forEach((id, i) => { teamBatters[id] = teamBattersArrays[i] || []; });
     const pitcherStats = {};
@@ -330,61 +362,93 @@ _internalHandler = async function() {
       pitcherVsTeam[key] = pitcherVsTeamArr[i] || { starts:0, era:0, ip:0, er:0 };
     });
 
-    // For each team, include ALL hitters with at least 5 season ABs (catches everyday players
-    // even when slumping, plus bench players who may have BvP history vs starter).
-    // Lower threshold than before (was 20) to catch slumping veterans and platoon bats.
+    // v14: index lineups by gamePk + side
+    const lineupsByKey = {};
+    lineupTasks.forEach((task, i) => {
+      const key = task.gamePk + '_' + task.teamSide;
+      lineupsByKey[key] = lineupArr[i]; // null if unconfirmed
+    });
+
     const teamHitters = {};
     for (const tid of teamIdArr) {
       teamHitters[tid] = (teamBatters[tid] || [])
         .filter(b => b.ab >= 5)
-        .sort((a, b) => b.ab - a.ab); // sort by AB count (regulars first)
+        .sort((a, b) => b.ab - a.ab);
     }
 
-    // Build list of BvP lookups needed (batter × opposing pitcher)
+    // v14: collect all unique batter IDs that we'll need recent form for
+    // Limit to those we'll actually rank - all hitters with 5+ ABs
+    const allBatterIds = new Set();
+    for (const tid of teamIdArr) {
+      (teamHitters[tid] || []).forEach(b => allBatterIds.add(b.personId));
+    }
+    const batterIdArr = Array.from(allBatterIds);
+
+    // Fetch recent form for all batters in parallel (keep concurrency reasonable)
+    const recentFormArr = await mapLimit(batterIdArr, 20, id => getBatterRecentForm(id, season));
+    const recentFormByBatter = {};
+    batterIdArr.forEach((id, i) => {
+      recentFormByBatter[id] = recentFormArr[i] || { games: 0, ab: 0, hits: 0, avg: 0 };
+    });
+
     const bvpTasks = [];
     games.forEach(g => {
       const parkFac = parkFactor(g.venue);
       const parkHit = parkHitFactor(g.venue);
-      // Away batters vs home pitcher
+      const awayLineupKey = g.gamePk + '_away';
+      const homeLineupKey = g.gamePk + '_home';
+      const awayLineup = lineupsByKey[awayLineupKey];
+      const homeLineup = lineupsByKey[homeLineupKey];
       (teamHitters[g.awayTeamId] || []).forEach(b => {
-        bvpTasks.push({ batter: b, pitcherId: g.homePitcherId, pitcherName: g.homePitcherName, teamAbbr: g.awayTeamAbbr, teamName: g.awayTeamName, teamId: g.awayTeamId, oppTeam: g.homeTeamAbbr, oppTeamId: g.homeTeamId, parkFac: parkFac, parkHit: parkHit, isHome: false, gamePk: g.gamePk, venue: g.venue });
+        const battingOrder = awayLineup ? (awayLineup[b.personId] || null) : null;
+        const lineupConfirmed = !!awayLineup;
+        bvpTasks.push({ batter: b, pitcherId: g.homePitcherId, pitcherName: g.homePitcherName, teamAbbr: g.awayTeamAbbr, teamName: g.awayTeamName, teamId: g.awayTeamId, oppTeam: g.homeTeamAbbr, oppTeamId: g.homeTeamId, parkFac: parkFac, parkHit: parkHit, isHome: false, gamePk: g.gamePk, venue: g.venue, battingOrder: battingOrder, lineupConfirmed: lineupConfirmed });
       });
-      // Home batters vs away pitcher
       (teamHitters[g.homeTeamId] || []).forEach(b => {
-        bvpTasks.push({ batter: b, pitcherId: g.awayPitcherId, pitcherName: g.awayPitcherName, teamAbbr: g.homeTeamAbbr, teamName: g.homeTeamName, teamId: g.homeTeamId, oppTeam: g.awayTeamAbbr, oppTeamId: g.awayTeamId, parkFac: parkFac, parkHit: parkHit, isHome: true, gamePk: g.gamePk, venue: g.venue });
+        const battingOrder = homeLineup ? (homeLineup[b.personId] || null) : null;
+        const lineupConfirmed = !!homeLineup;
+        bvpTasks.push({ batter: b, pitcherId: g.awayPitcherId, pitcherName: g.awayPitcherName, teamAbbr: g.homeTeamAbbr, teamName: g.homeTeamName, teamId: g.homeTeamId, oppTeam: g.awayTeamAbbr, oppTeamId: g.awayTeamId, parkFac: parkFac, parkHit: parkHit, isHome: true, gamePk: g.gamePk, venue: g.venue, battingOrder: battingOrder, lineupConfirmed: lineupConfirmed });
       });
     });
 
-    // Fetch BvP in parallel (batched). Higher concurrency since we're now checking full rosters.
     const bvpResults = await mapLimit(bvpTasks, 30, async task => {
       if (!task.pitcherId) return { ab: 0, hits: 0, avg: 0 };
       return await getBvP(task.batter.personId, task.pitcherId);
     });
 
-    // Build final picks
     const picks = [];
     bvpTasks.forEach((task, i) => {
       const bvp = bvpResults[i];
       const seasonAvg = task.batter.avg;
+      const recentForm = recentFormByBatter[task.batter.personId] || { games:0, ab:0, hits:0, avg:0 };
+
+      // v14: blend uses recent form too if we have meaningful sample
+      // Old: season + BvP only. New: weight recent form alongside season.
       let blended = seasonAvg;
-      if (bvp.ab >= 10) blended = 0.6 * seasonAvg + 0.4 * bvp.avg;
-      else if (bvp.ab >= 5) blended = 0.8 * seasonAvg + 0.2 * bvp.avg;
-      // Use parkHitFactor now (hit-specific) instead of parkFac (run-based)
+      if (recentForm.ab >= 30) {
+        // Solid 15-game sample: 50% season + 50% recent
+        blended = 0.5 * seasonAvg + 0.5 * recentForm.avg;
+      } else if (recentForm.ab >= 15) {
+        // Partial sample: 70% season + 30% recent
+        blended = 0.7 * seasonAvg + 0.3 * recentForm.avg;
+      }
+      // Then layer in BvP if we have it
+      if (bvp.ab >= 10) blended = 0.6 * blended + 0.4 * bvp.avg;
+      else if (bvp.ab >= 5) blended = 0.8 * blended + 0.2 * bvp.avg;
+
       const adjusted = blended * task.parkHit;
       const perAB = Math.min(0.99, Math.max(0.01, adjusted));
       const gameHitProb = 1 - Math.pow(1 - perAB, 4);
 
-      // Resolve pitcher data
       const pStat = task.pitcherId ? pitcherStats[task.pitcherId] : null;
       const pLast3 = task.pitcherId ? pitcherLast3[task.pitcherId] : { starts:0, era:0, ip:0, er:0 };
       const vsTeamKey = task.pitcherId + '_' + task.teamId;
       const pVsTeam = pitcherVsTeam[vsTeamKey] || { starts:0, era:0, ip:0, er:0 };
 
-      // Determine platoon advantage (LHB vs RHP or RHB vs LHP = platoon)
       const batSide = task.batter.batSide || 'R';
       const pHand = (pStat && pStat.pitchHand) || 'R';
       let platoonAdv = false;
-      if (batSide === 'S') platoonAdv = true; // switch hitters always have advantage
+      if (batSide === 'S') platoonAdv = true;
       else if (batSide !== pHand) platoonAdv = true;
 
       picks.push({
@@ -396,6 +460,14 @@ _internalHandler = async function() {
         seasonAvg: seasonAvg,
         seasonAb: task.batter.ab,
         seasonOps: task.batter.ops,
+        // v14 NEW
+        recentAvg: recentForm.avg,
+        recentAb: recentForm.ab,
+        recentHits: recentForm.hits,
+        recentGames: recentForm.games,
+        battingOrder: task.battingOrder,
+        lineupConfirmed: task.lineupConfirmed,
+        // existing
         bvpAb: bvp.ab,
         bvpHits: bvp.hits,
         bvpAvg: bvp.avg,
@@ -459,12 +531,9 @@ export default async function handler(req, res) {
     const result = await _internalHandler();
     const statusCode = result.statusCode || 200;
     const headers = result.headers || { 'Content-Type': 'application/json' };
-    
-    // Set headers
     for (const [key, value] of Object.entries(headers)) {
       res.setHeader(key, value);
     }
-    
     res.status(statusCode).send(result.body);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message || String(e) });
