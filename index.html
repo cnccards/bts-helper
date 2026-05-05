@@ -141,10 +141,14 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.grn{background:var(--grn)}
 .toast.red{background:var(--red)}
+.lineup-badge{display:inline-block;background:var(--blu);color:#fff;font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;margin-right:5px;line-height:1.3}
+.lineup-badge.top{background:var(--grn)}
+.lineup-badge.bot{background:var(--red)}
+.lineup-badge.unc{background:var(--fog);color:#fff}
 </style>
 </head>
 <body>
-<div class="ver-tag">v13 true career bvp</div>
+<div class="ver-tag">v14 form + lineup</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -227,6 +231,21 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
     <div class="fbtn" data-val="0.290">.290+</div>
     <div class="fbtn" data-val="0.310">.310+</div>
     <div class="fbtn" data-val="0.330">.330+</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Recent form (last 15 games)</div>
+  <div class="filter-row" id="searchFilterRecent">
+    <div class="fbtn on" data-val="0">Any</div>
+    <div class="fbtn" data-val="0.250">.250+</div>
+    <div class="fbtn" data-val="0.280">.280+</div>
+    <div class="fbtn" data-val="0.310">.310+</div>
+    <div class="fbtn" data-val="hot">Hot only (&gt;season)</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Lineup status</div>
+  <div class="filter-row" id="searchFilterLineup">
+    <div class="fbtn on" data-val="any">Any</div>
+    <div class="fbtn" data-val="confirmed">Confirmed only</div>
+    <div class="fbtn" data-val="top5">Top 5 of order</div>
+    <div class="fbtn" data-val="top3">Top 3 only</div>
   </div>
   <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Matchup</div>
   <div class="filter-row" id="searchFilterMatchup">
@@ -339,15 +358,14 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 
 <div class="screen" id="s-guide">
   <div class="sh">How Hit Probability is Calculated</div>
-  <div class="ibox gold"><strong>Pulling live from MLB Stats API:</strong><br>&bull; Each team's top 10 batters by season AVG (min 20 ABs)<br>&bull; Career batter vs pitcher (BvP) record<br>&bull; Ballpark hit factor<br>&bull; Starting pitcher ERA/WHIP/BAA</div>
-  <div class="ibox grn"><strong>Formula:</strong><br>Season AVG blended with BvP (40% weight if 10+ ABs, 20% if 5-9 ABs) &times; park factor. Converted from per-AB probability to per-game (4 AB) probability.</div>
-  <div class="ibox blu"><strong>Double Down:</strong> Only when BOTH picks are 68%+. If either is under 65%, go single pick.</div>
-  <div class="ibox red"><strong>Still avoid:</strong><br>&#x2717; Batters we show but you notice are slumping (0-for-20)<br>&#x2717; Pitchers with ERA under 2.50 regardless<br>&#x2717; Never-start lineups (check scratches at game time)</div>
+  <div class="ibox gold"><strong>Pulling live from MLB Stats API:</strong><br>&bull; Each team's active hitters with 5+ ABs<br>&bull; Last 15 games rolling AVG (recent form)<br>&bull; Career batter vs pitcher (BvP) record<br>&bull; Today's confirmed lineup + batting order<br>&bull; Ballpark hit factor<br>&bull; Starting pitcher ERA/WHIP/BAA + last 3 starts</div>
+  <div class="ibox grn"><strong>Formula (v14):</strong><br>Season AVG blended with recent 15-game form (50/50 if 30+ABs in last 15) + BvP (40% weight if 10+ ABs, 20% if 5-9 ABs) &times; park hit factor.</div>
+  <div class="ibox blu"><strong>Lineup status:</strong> If lineups are confirmed for tonight's games, you'll see a batting order badge (1-9). Top of order = more ABs = better odds. Yellow "?" badge = lineup not posted yet.</div>
+  <div class="ibox red"><strong>Slump warning:</strong> If a player's last-15 AVG is well below their season AVG, you'll see a &#x1F4C9; badge. Consider fading slumping vets.</div>
   <div class="ibox">&#x1F6E1; <strong>Streak Saver</strong> activates at 10-game streak automatically.</div>
 </div>
 
 <script>
-// ========== GLOBAL ERROR HANDLER ==========
 window.addEventListener('error', function(e) {
   var wrap = document.getElementById('topWrap') || document.getElementById('gamesWrap');
   if (wrap && wrap.innerHTML.indexOf('Building') >= 0) {
@@ -355,7 +373,6 @@ window.addEventListener('error', function(e) {
   }
 });
 
-// ========== PARK DATA ==========
 var PARKS = [
   {name:'Coors Field',team:'Colorado Rockies',hit:117,hr:126,rating:'great'},
   {name:'Fenway Park',team:'Boston Red Sox',hit:110,hr:108,rating:'great'},
@@ -379,7 +396,6 @@ var PARKS = [
   {name:'Sutter Health Park',team:'Athletics',hit:96,hr:88,rating:'bad'}
 ];
 
-// ========== LOCAL STORAGE ==========
 var ls = {
   get: function(k) { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } },
   set: function(k,v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
@@ -389,13 +405,44 @@ var streak = ls.get('bts_streak') || 0;
 var btsHist = ls.get('bts_history') || [];
 var picks = ls.get('bts_picks') || [null,null];
 
-// Data from the /api/picks backend
 var picksData = null;
 var myPlayersData = null;
 var hrData = null;
 var activeFilter = 'all';
 
-// ========== INIT ==========
+// v14: helper to build lineup badge HTML for any pick
+function lineupBadgeHTML(p) {
+  if (!p.lineupConfirmed) return '<span class="lineup-badge unc" title="Lineup not posted yet">?</span>';
+  if (!p.battingOrder) return ''; // not in starting lineup
+  var cls = p.battingOrder <= 5 ? 'top' : p.battingOrder >= 7 ? 'bot' : '';
+  return '<span class="lineup-badge ' + cls + '" title="Batting ' + p.battingOrder + '">' + p.battingOrder + '</span>';
+}
+
+// v14: helper to format recent form display
+function recentFormHTML(p) {
+  if (!p.recentAb || p.recentAb < 5) return '';
+  var avg = p.recentAvg;
+  var disp = '.' + String(Math.round(avg*1000)).padStart(3,'0');
+  var color = '';
+  // Slump warning: recent AVG significantly below season
+  if (p.seasonAvg > 0 && avg < p.seasonAvg - 0.060) color = 'color:var(--red);font-weight:600';
+  // Hot: recent AVG significantly above season
+  else if (p.seasonAvg > 0 && avg > p.seasonAvg + 0.060) color = 'color:var(--grn);font-weight:600';
+  return '<span style="' + color + '"> &middot; L15: ' + disp + ' (' + p.recentAb + ' AB)</span>';
+}
+
+// v14: slump indicator
+function slumpBadge(p) {
+  if (!p.recentAb || p.recentAb < 15) return '';
+  if (p.seasonAvg > 0 && p.recentAvg < p.seasonAvg - 0.060) {
+    return '<span style="color:var(--red);font-weight:700">&#x1F4C9; slump</span>';
+  }
+  if (p.seasonAvg > 0 && p.recentAvg > p.seasonAvg + 0.060) {
+    return '<span style="color:var(--grn);font-weight:700">&#x1F4C8; hot</span>';
+  }
+  return '';
+}
+
 function init() {
   var today = new Date();
   var dateStr = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -429,8 +476,7 @@ function wireButtons() {
   document.getElementById('searchRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('myRefresh').addEventListener('click', loadMyPlayers);
 
-  // Search filter chips - single-select per group
-  ['searchFilterAvg','searchFilterMatchup','searchFilterPark','searchFilterLoc','searchFilterPitcher'].forEach(function(groupId) {
+  ['searchFilterAvg','searchFilterRecent','searchFilterLineup','searchFilterMatchup','searchFilterPark','searchFilterLoc','searchFilterPitcher'].forEach(function(groupId) {
     var group = document.getElementById(groupId);
     if (!group) return;
     var chips = group.querySelectorAll('.fbtn');
@@ -451,14 +497,13 @@ function wireButtons() {
   document.getElementById('btnReset').addEventListener('click', resetStreak);
 }
 
-// ========== LOAD PICKS FROM BACKEND ==========
 function loadTopPicks() {
   document.getElementById('topWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Building today\'s picks...</div><div class="load-sub">Pulling from MLB Stats API — this takes 30-60s on first load</div></div>';
   document.getElementById('gamesWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Loading games...</div></div>';
   document.getElementById('topFilter').style.display = 'none';
 
   var controller = new AbortController();
-  var timer = setTimeout(function() { controller.abort(); }, 90000); // 90s hard cap
+  var timer = setTimeout(function() { controller.abort(); }, 90000);
 
   fetch('/api/picks', { signal: controller.signal })
     .then(function(r) {
@@ -487,7 +532,6 @@ function loadTopPicks() {
     });
 }
 
-// ========== RENDER TOP PICKS ==========
 function renderTop() {
   if (!picksData) return;
   var wrap = document.getElementById('topWrap');
@@ -498,7 +542,6 @@ function renderTop() {
     return;
   }
 
-  // Build filter: All + each game
   var fr = document.getElementById('topFilter');
   fr.style.display = 'flex';
   var fhtml = '<div class="fbtn ' + (activeFilter === 'all' ? 'on' : '') + '" data-f="all">All Games</div>';
@@ -507,7 +550,6 @@ function renderTop() {
     fhtml += '<div class="fbtn ' + (activeFilter === key ? 'on' : '') + '" data-f="' + key + '">' + g.awayAbbr + ' @ ' + g.homeAbbr + '</div>';
   });
   fr.innerHTML = fhtml;
-  // wire filter buttons
   var fbtns = fr.querySelectorAll('.fbtn');
   for (var i = 0; i < fbtns.length; i++) {
     fbtns[i].addEventListener('click', function() {
@@ -516,7 +558,6 @@ function renderTop() {
     });
   }
 
-  // Filter picks
   var filtered = picksData.picks;
   if (activeFilter !== 'all') {
     var parts = activeFilter.split('@');
@@ -531,8 +572,7 @@ function renderTop() {
     return;
   }
 
-  // Header info
-  var html = '<div class="ibox blu" style="margin-bottom:11px">Top ' + filtered.length + ' batters ranked by hit probability. Tap &#x2B50; to set as Pick 1 or &#x1F4AA; for Pick 2. Data pulled live from MLB.</div>';
+  var html = '<div class="ibox blu" style="margin-bottom:11px">Top ' + filtered.length + ' batters ranked by hit probability. Tap &#x2B50; to set as Pick 1 or &#x1F4AA; for Pick 2.</div>';
 
   filtered.forEach(function(p, i) {
     var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
@@ -549,19 +589,20 @@ function renderTop() {
     var pitcherERA = p.pitcherStats && p.pitcherStats.era ? p.pitcherStats.era.toFixed(2) : null;
     var pitcherInfo = oppPitcher + (pitcherERA ? ' (' + pitcherERA + ' ERA)' : '');
 
-    // Escape quotes for data attributes
     var nameEsc = String(p.name).replace(/"/g,'&quot;');
     var teamEsc = String(p.team).replace(/"/g,'&quot;');
 
     html += '<div class="' + cls + '">';
     html += '<div class="pick-rank">' + rank + '</div>';
     html += '<div class="pick-main">';
-    html += '<div class="pick-name">' + p.name + '</div>';
+    // v14: lineup badge before name
+    html += '<div class="pick-name">' + lineupBadgeHTML(p) + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
-    html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + '</div>';
+    html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + recentFormHTML(p) + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + '</div>';
 
-    // v11: add signal badges (platoon adv, pitcher form, hitter's park)
     var tBadges = [];
+    var slumpHtml = slumpBadge(p);
+    if (slumpHtml) tBadges.push(slumpHtml);
     if (p.platoonAdvantage) tBadges.push('<span style="color:var(--grn);font-weight:700">&#x26A1; platoon</span>');
     var tPStat = p.pitcherStats;
     var tPL3 = p.pitcherLast3;
@@ -594,7 +635,6 @@ function renderTop() {
 
   wrap.innerHTML = html;
 
-  // Wire pick buttons
   var btns = wrap.querySelectorAll('.pick-btn');
   for (var j = 0; j < btns.length; j++) {
     btns[j].addEventListener('click', function() {
@@ -610,7 +650,6 @@ function renderTop() {
   }
 }
 
-// ========== RENDER SEARCH ==========
 function getFilterVal(groupId) {
   var group = document.getElementById(groupId);
   if (!group) return null;
@@ -627,23 +666,37 @@ function renderSearch() {
     return;
   }
 
-  // Read filter values
   var minAvg = parseFloat(getFilterVal('searchFilterAvg') || '0');
+  var recentVal = getFilterVal('searchFilterRecent') || '0';
+  var lineupVal = getFilterVal('searchFilterLineup') || 'any';
   var matchup = getFilterVal('searchFilterMatchup') || 'any';
   var park = getFilterVal('searchFilterPark') || 'any';
   var loc = getFilterVal('searchFilterLoc') || 'any';
   var pitchForm = getFilterVal('searchFilterPitcher') || 'any';
 
-  // Apply filters
   var filtered = picksData.picks.filter(function(p) {
-    // Min season AVG
     if (minAvg > 0 && p.seasonAvg < minAvg) return false;
 
-    // Matchup filter
+    // v14: recent form filter
+    if (recentVal === 'hot') {
+      if (!p.recentAb || p.recentAb < 10 || p.recentAvg <= p.seasonAvg) return false;
+    } else if (recentVal !== '0') {
+      var recMin = parseFloat(recentVal);
+      if (!p.recentAb || p.recentAb < 10 || p.recentAvg < recMin) return false;
+    }
+
+    // v14: lineup filter
+    if (lineupVal === 'confirmed') {
+      if (!p.lineupConfirmed || !p.battingOrder) return false;
+    } else if (lineupVal === 'top5') {
+      if (!p.battingOrder || p.battingOrder > 5) return false;
+    } else if (lineupVal === 'top3') {
+      if (!p.battingOrder || p.battingOrder > 3) return false;
+    }
+
     var bs = p.batSide || 'R';
     var ph = p.pitcherHand || 'R';
     if (matchup === 'platoon') {
-      // Platoon advantage: LHB vs RHP, RHB vs LHP, or switch hitter
       if (!p.platoonAdvantage) return false;
     } else if (matchup === 'lvr') {
       if (bs !== 'L' || ph !== 'R') return false;
@@ -651,41 +704,28 @@ function renderSearch() {
       if (bs !== 'R' || ph !== 'L') return false;
     }
 
-    // Park filter — hitter's parks = parkHitFactor >= 1.02
     if (park === 'hitters') {
       var phf = p.parkHitFactor || 1.0;
       if (phf < 1.02) return false;
     }
 
-    // Home/away filter
     if (loc === 'home' && !p.isHome) return false;
     if (loc === 'away' && p.isHome) return false;
 
-    // Pitcher form filter
     if (pitchForm === 'struggling') {
-      // Pitcher struggling: last3 ERA > season ERA × 1.5 AND last3 has 2+ starts
       var pStat = p.pitcherStats;
       var pL3 = p.pitcherLast3;
       if (!pStat || !pL3 || pL3.starts < 2 || !pStat.era) return false;
       if (pL3.era <= pStat.era * 1.5) return false;
     } else if (pitchForm === 'owns') {
-      // Pitcher owns team: 2+ starts vs this team, ERA under 3.50
       var pvt = p.pitcherVsTeam;
-      if (!pvt || pvt.starts < 2 || pvt.era > 3.50 || pvt.era === 0) return false;
-      // Actually flip: we want cards where pitcher DOESN'T own the team (team has hit them well)
-      // "Pitcher Owns Team" chip should show cards where that's true → this is bad for BATTER
-      // Reframe: this chip should show batters whose team has a HIGH ERA vs this pitcher (hitters advantage)
-      // Actually flip logic: show cards where pitcher struggles vs this team (ERA >= 5.00)
-      if (pvt.era < 5.00) return false;
+      if (!pvt || pvt.starts < 2 || pvt.era < 5.00) return false;
     }
 
     return true;
   });
 
-  // Sort by hit probability desc
   filtered.sort(function(a, b) { return b.hitProb - a.hitProb; });
-
-  // Cap at top 50
   var top = filtered.slice(0, 50);
 
   if (!top.length) {
@@ -703,8 +743,9 @@ function renderSearch() {
     var locIcon = p.isHome ? '&#x1F3E0;' : '&#x2708;&#xFE0F;';
     var oppPitcher = p.opposingPitcher || 'TBD';
 
-    // Build indicators
     var badges = [];
+    var slumpHtml = slumpBadge(p);
+    if (slumpHtml) badges.push(slumpHtml);
     if (p.platoonAdvantage) badges.push('<span class="pick-bvp-yes">PLATOON &#x26A1;</span>');
 
     var pStat = p.pitcherStats;
@@ -731,14 +772,12 @@ function renderSearch() {
 
     var badgeStr = badges.length ? '<div class="pick-stats" style="margin-top:3px">' + badges.join(' &middot; ') + '</div>' : '';
 
-    // BvP line
     var bvpLine = '';
     if (p.bvpAb >= 5) {
       var bvpAvgDisp = '.' + String(Math.round(p.bvpAvg*1000)).padStart(3,'0');
       bvpLine = ' &middot; BvP ' + p.bvpHits + '/' + p.bvpAb + ' (' + bvpAvgDisp + ')';
     }
 
-    // Handedness display
     var handDisp = (p.batSide || 'R') + 'HB vs ' + (p.pitcherHand || 'R') + 'HP';
 
     var nameEsc = String(p.name).replace(/"/g,'&quot;');
@@ -747,9 +786,9 @@ function renderSearch() {
     html += '<div class="' + cls + '">';
     html += '<div class="pick-rank">' + rank + '</div>';
     html += '<div class="pick-main">';
-    html += '<div class="pick-name">' + p.name + '</div>';
+    html += '<div class="pick-name">' + lineupBadgeHTML(p) + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + locIcon + ' vs ' + oppPitcher + ' &middot; ' + handDisp + '</div>';
-    html += '<div class="pick-stats">Season ' + seasonAvgDisp + bvpLine + '</div>';
+    html += '<div class="pick-stats">Season ' + seasonAvgDisp + recentFormHTML(p) + bvpLine + '</div>';
     html += badgeStr;
     html += '</div>';
     html += '<div>';
@@ -780,7 +819,6 @@ function renderSearch() {
   }
 }
 
-// ========== RENDER BVP LEADERS ==========
 function renderBvP() {
   if (!picksData) return;
   var wrap = document.getElementById('bvpWrap');
@@ -790,7 +828,6 @@ function renderBvP() {
     return;
   }
 
-  // Filter to picks with meaningful BvP history (at least 3 ABs - lowered from 5 for max coverage)
   var bvpOnly = picksData.picks.filter(function(p) {
     return p.bvpAb >= 3 && p.opposingPitcher && p.opposingPitcher !== 'TBD';
   });
@@ -800,16 +837,14 @@ function renderBvP() {
     return;
   }
 
-  // Sort by BvP average descending, then by BvP AB count as tiebreaker
   bvpOnly.sort(function(a, b) {
     if (b.bvpAvg !== a.bvpAvg) return b.bvpAvg - a.bvpAvg;
     return b.bvpAb - a.bvpAb;
   });
 
-  // Take top 30
   var top = bvpOnly.slice(0, 30);
 
-  var html = '<div class="ibox blu" style="margin-bottom:11px">Top ' + top.length + ' batters sorted by career batting average vs today\'s starting pitcher (min 5 ABs). Tap &#x2B50; P1 / &#x1F4AA; P2 to save as a pick.</div>';
+  var html = '<div class="ibox blu" style="margin-bottom:11px">Top ' + top.length + ' batters sorted by career batting average vs today\'s starting pitcher (min 3 ABs).</div>';
 
   top.forEach(function(p, i) {
     var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
@@ -827,14 +862,15 @@ function renderBvP() {
     html += '<div class="' + cls + '">';
     html += '<div class="pick-rank">' + rank + '</div>';
     html += '<div class="pick-main">';
-    html += '<div class="pick-name">' + p.name + '</div>';
+    html += '<div class="pick-name">' + lineupBadgeHTML(p) + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
-    html += '<div class="pick-stats"><span class="pick-bvp-yes">BvP: ' + p.bvpHits + '-for-' + p.bvpAb + ' (' + bvpAvgDisp + ')</span> &middot; Season ' + seasonAvgDisp + '</div>';
+    html += '<div class="pick-stats"><span class="pick-bvp-yes">BvP: ' + p.bvpHits + '-for-' + p.bvpAb + ' (' + bvpAvgDisp + ')</span> &middot; Season ' + seasonAvgDisp + recentFormHTML(p) + '</div>';
 
-    // Pitcher form + vs-team line (new in v11)
     var pL3 = p.pitcherLast3;
     var pVT = p.pitcherVsTeam;
     var formParts = [];
+    var slumpHtml = slumpBadge(p);
+    if (slumpHtml) formParts.push(slumpHtml);
     if (pL3 && pL3.starts > 0) {
       var formIcon = '';
       if (p.pitcherStats && p.pitcherStats.era > 0) {
@@ -880,7 +916,6 @@ function renderBvP() {
   }
 }
 
-// ========== RENDER GAMES ==========
 function renderGames() {
   if (!picksData) return;
   var wrap = document.getElementById('gamesWrap');
@@ -889,7 +924,7 @@ function renderGames() {
     return;
   }
 
-  var html = '<div class="ibox blu" style="margin-bottom:11px">' + picksData.games.length + ' games today. Tap a game in the Top Picks tab to filter picks to just that game.</div>';
+  var html = '<div class="ibox blu" style="margin-bottom:11px">' + picksData.games.length + ' games today.</div>';
   picksData.games.forEach(function(g, i) {
     var cls = 'gcard';
     var gt = '';
@@ -906,13 +941,10 @@ function renderGames() {
   wrap.innerHTML = html;
 }
 
-// ========== HOME RUNS ==========
 function loadHR() {
   document.getElementById('hrWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Finding today\'s top HR candidates...</div><div class="load-sub">Power + park + pitcher HR/9</div></div>';
-
   var controller = new AbortController();
   var timer = setTimeout(function() { controller.abort(); }, 60000);
-
   fetch('/api/homeruns', { signal: controller.signal })
     .then(function(r) {
       clearTimeout(timer);
@@ -935,15 +967,13 @@ function loadHR() {
 function renderHR() {
   if (!hrData) return;
   var wrap = document.getElementById('hrWrap');
-  var picks = hrData.picks || [];
-  if (!picks.length) {
+  var picksHR = hrData.picks || [];
+  if (!picksHR.length) {
     wrap.innerHTML = '<div class="err-box"><div class="err-icon">&#x26BE;</div><div class="err-txt">No HR candidates</div><div class="err-sub">' + (hrData.message || 'No games scheduled') + '</div></div>';
     return;
   }
-
-  var top30 = picks.slice(0, 30);
-  var html = '<div class="ibox gold" style="margin-bottom:11px"><strong>Top ' + top30.length + ' HR candidates.</strong> Based on season HR rate, park HR factor, and opposing pitcher\'s HR/9 allowed. Tap P1/P2 to set a pick.</div>';
-
+  var top30 = picksHR.slice(0, 30);
+  var html = '<div class="ibox gold" style="margin-bottom:11px"><strong>Top ' + top30.length + ' HR candidates.</strong></div>';
   top30.forEach(function(p, i) {
     var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
     var loc = p.isHome ? '&#x1F3E0; HOME' : '&#x2708;&#xFE0F; AWAY';
@@ -954,7 +984,6 @@ function renderHR() {
     var teamEsc = String(p.team).replace(/"/g,'&quot;');
     var isoDisp = p.seasonIso ? '.' + String(Math.round(p.seasonIso*1000)).padStart(3,'0') : '---';
     var rate = (p.hrRate * 100).toFixed(1);
-
     html += '<div class="' + cls + '">';
     html += '<div class="pick-rank">' + (i+1) + '</div>';
     html += '<div class="pick-main">';
@@ -969,9 +998,7 @@ function renderHR() {
     html += '</div>';
     html += '</div>';
   });
-
   wrap.innerHTML = html;
-
   var btns = wrap.querySelectorAll('.pick-btn');
   for (var j = 0; j < btns.length; j++) {
     btns[j].addEventListener('click', function() {
@@ -987,13 +1014,10 @@ function renderHR() {
   }
 }
 
-// ========== MY PLAYERS ==========
 function loadMyPlayers() {
-  document.getElementById('myWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Checking your players...</div><div class="load-sub">Looking up today\'s matchups</div></div>';
-
+  document.getElementById('myWrap').innerHTML = '<div class="loading"><div class="spin"></div><div class="load-txt">Checking your players...</div></div>';
   var controller = new AbortController();
   var timer = setTimeout(function() { controller.abort(); }, 60000);
-
   fetch('/api/myplayers', { signal: controller.signal })
     .then(function(r) {
       clearTimeout(timer);
@@ -1020,9 +1044,7 @@ function renderMyPlayers() {
   var playing = players.filter(function(p) { return p.found && p.playing; });
   var notPlaying = players.filter(function(p) { return p.found && !p.playing; });
   var notFound = players.filter(function(p) { return !p.found; });
-
-  var html = '<div class="ibox blu" style="margin-bottom:11px"><strong>' + playing.length + ' of ' + players.length + ' playing today.</strong> Ranked by hit probability. Tap P1 or P2 to use as a pick.</div>';
-
+  var html = '<div class="ibox blu" style="margin-bottom:11px"><strong>' + playing.length + ' of ' + players.length + ' playing today.</strong></div>';
   if (playing.length) {
     playing.forEach(function(p, i) {
       var cls = i === 0 ? 'pick-card hot' : i <= 2 ? 'pick-card good' : 'pick-card';
@@ -1035,7 +1057,6 @@ function renderMyPlayers() {
       var pitcherInfo = p.opposingPitcher + era;
       var nameEsc = String(p.name).replace(/"/g,'&quot;');
       var teamEsc = String(p.teamAbbr).replace(/"/g,'&quot;');
-
       html += '<div class="' + cls + '">';
       html += '<div class="pick-rank">' + (i+1) + '</div>';
       html += '<div class="pick-main">';
@@ -1051,7 +1072,6 @@ function renderMyPlayers() {
       html += '</div>';
     });
   }
-
   if (notPlaying.length) {
     html += '<div class="sh" style="margin-top:16px">Not Playing Today</div>';
     notPlaying.forEach(function(p) {
@@ -1061,7 +1081,6 @@ function renderMyPlayers() {
       html += '</div>';
     });
   }
-
   if (notFound.length) {
     html += '<div class="sh" style="margin-top:16px">Not in MLB</div>';
     notFound.forEach(function(p) {
@@ -1071,9 +1090,7 @@ function renderMyPlayers() {
       html += '</div>';
     });
   }
-
   wrap.innerHTML = html;
-
   var btns = wrap.querySelectorAll('.pick-btn');
   for (var j = 0; j < btns.length; j++) {
     btns[j].addEventListener('click', function() {
@@ -1089,7 +1106,6 @@ function renderMyPlayers() {
   }
 }
 
-// ========== PARKS/STREAK/HISTORY (unchanged) ==========
 function renderParks() {
   var sorted = PARKS.slice().sort(function(a,b) { return b.hit - a.hit; });
   document.getElementById('parkRows').innerHTML = sorted.map(function(p) {
