@@ -283,6 +283,51 @@ async function getTeamLineup(gamePk, teamSide) {
   return null;
 }
 
+// v15 NEW: Get game over/under totals from The Odds API
+// Returns map of "AwayTeam@HomeTeam" -> total (e.g., 8.5)
+// Returns empty map if API key missing or call fails - graceful degradation
+async function getGameTotals() {
+  const apiKey = process.env.ODDS_API_KEY;
+  if (!apiKey) return {}; // No key configured - skip silently
+
+  const url = 'https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions=us&markets=totals&oddsFormat=american&apiKey=' + apiKey;
+  try {
+    const data = await fetchJson(url, 4000);
+    if (!Array.isArray(data)) return {};
+
+    const totalsMap = {};
+    for (const game of data) {
+      const home = game.home_team;
+      const away = game.away_team;
+      if (!home || !away) continue;
+
+      // Find first bookmaker with totals data, average their over/under point
+      let totalSum = 0, totalCount = 0;
+      for (const book of (game.bookmakers || [])) {
+        for (const market of (book.markets || [])) {
+          if (market.key !== 'totals') continue;
+          for (const outcome of (market.outcomes || [])) {
+            if (outcome.point != null) {
+              totalSum += outcome.point;
+              totalCount++;
+              break; // one point per market (over and under share the same point)
+            }
+          }
+        }
+      }
+      if (totalCount > 0) {
+        const avgTotal = totalSum / totalCount;
+        // Index by both team-name and abbreviation-friendly key
+        const key = away + '@' + home;
+        totalsMap[key] = Math.round(avgTotal * 10) / 10;
+      }
+    }
+    return totalsMap;
+  } catch (e) {
+    return {};
+  }
+}
+
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length);
   let i = 0;
@@ -342,12 +387,13 @@ _internalHandler = async function() {
       lineupTasks.push({ gamePk: g.gamePk, teamSide: 'away', teamId: g.awayTeamId });
     });
 
-    const [teamBattersArrays, pitcherStatsArr, pitcherLast3Arr, pitcherVsTeamArr, lineupArr] = await Promise.all([
+    const [teamBattersArrays, pitcherStatsArr, pitcherLast3Arr, pitcherVsTeamArr, lineupArr, gameTotalsMap] = await Promise.all([
       mapLimit(teamIdArr, 10, id => getTeamBattersWithStats(id, season)),
       mapLimit(pitcherIdArr, 10, id => getPitcherStats(id, season)),
       mapLimit(pitcherIdArr, 10, id => getPitcherLast3(id, season)),
       mapLimit(pitcherVsTeamPairs, 10, pair => getPitcherVsTeam(pair.pitcherId, pair.teamId, season)),
-      mapLimit(lineupTasks, 15, t => getTeamLineup(t.gamePk, t.teamSide))
+      mapLimit(lineupTasks, 15, t => getTeamLineup(t.gamePk, t.teamSide)),
+      getGameTotals()
     ]);
 
     const teamBatters = {};
@@ -399,15 +445,18 @@ _internalHandler = async function() {
       const homeLineupKey = g.gamePk + '_home';
       const awayLineup = lineupsByKey[awayLineupKey];
       const homeLineup = lineupsByKey[homeLineupKey];
+      // v15: lookup game total by team-name key
+      const totalKey = g.awayTeamName + '@' + g.homeTeamName;
+      const gameTotal = gameTotalsMap[totalKey] || null;
       (teamHitters[g.awayTeamId] || []).forEach(b => {
         const battingOrder = awayLineup ? (awayLineup[b.personId] || null) : null;
         const lineupConfirmed = !!awayLineup;
-        bvpTasks.push({ batter: b, pitcherId: g.homePitcherId, pitcherName: g.homePitcherName, teamAbbr: g.awayTeamAbbr, teamName: g.awayTeamName, teamId: g.awayTeamId, oppTeam: g.homeTeamAbbr, oppTeamId: g.homeTeamId, parkFac: parkFac, parkHit: parkHit, isHome: false, gamePk: g.gamePk, venue: g.venue, battingOrder: battingOrder, lineupConfirmed: lineupConfirmed });
+        bvpTasks.push({ batter: b, pitcherId: g.homePitcherId, pitcherName: g.homePitcherName, teamAbbr: g.awayTeamAbbr, teamName: g.awayTeamName, teamId: g.awayTeamId, oppTeam: g.homeTeamAbbr, oppTeamId: g.homeTeamId, parkFac: parkFac, parkHit: parkHit, isHome: false, gamePk: g.gamePk, venue: g.venue, battingOrder: battingOrder, lineupConfirmed: lineupConfirmed, gameTotal: gameTotal });
       });
       (teamHitters[g.homeTeamId] || []).forEach(b => {
         const battingOrder = homeLineup ? (homeLineup[b.personId] || null) : null;
         const lineupConfirmed = !!homeLineup;
-        bvpTasks.push({ batter: b, pitcherId: g.awayPitcherId, pitcherName: g.awayPitcherName, teamAbbr: g.homeTeamAbbr, teamName: g.homeTeamName, teamId: g.homeTeamId, oppTeam: g.awayTeamAbbr, oppTeamId: g.awayTeamId, parkFac: parkFac, parkHit: parkHit, isHome: true, gamePk: g.gamePk, venue: g.venue, battingOrder: battingOrder, lineupConfirmed: lineupConfirmed });
+        bvpTasks.push({ batter: b, pitcherId: g.awayPitcherId, pitcherName: g.awayPitcherName, teamAbbr: g.homeTeamAbbr, teamName: g.homeTeamName, teamId: g.homeTeamId, oppTeam: g.awayTeamAbbr, oppTeamId: g.awayTeamId, parkFac: parkFac, parkHit: parkHit, isHome: true, gamePk: g.gamePk, venue: g.venue, battingOrder: battingOrder, lineupConfirmed: lineupConfirmed, gameTotal: gameTotal });
       });
     });
 
@@ -467,6 +516,7 @@ _internalHandler = async function() {
         recentGames: recentForm.games,
         battingOrder: task.battingOrder,
         lineupConfirmed: task.lineupConfirmed,
+        gameTotal: task.gameTotal,
         // existing
         bvpAb: bvp.ab,
         bvpHits: bvp.hits,
