@@ -148,7 +148,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v14 form + lineup</div>
+<div class="ver-tag">v15 vegas totals</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -239,6 +239,13 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
     <div class="fbtn" data-val="0.280">.280+</div>
     <div class="fbtn" data-val="0.310">.310+</div>
     <div class="fbtn" data-val="hot">Hot only (&gt;season)</div>
+  </div>
+  <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Game Total (Vegas O/U)</div>
+  <div class="filter-row" id="searchFilterTotal">
+    <div class="fbtn on" data-val="0">Any</div>
+    <div class="fbtn" data-val="7.5">7.5+</div>
+    <div class="fbtn" data-val="8.5">8.5+</div>
+    <div class="fbtn" data-val="9.5">9.5+ &#x1F4C8;</div>
   </div>
   <div style="font-size:10px;font-weight:700;color:var(--fog);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Lineup status</div>
   <div class="filter-row" id="searchFilterLineup">
@@ -443,6 +450,18 @@ function slumpBadge(p) {
   return '';
 }
 
+// v15: game total display (Vegas over/under)
+function gameTotalHTML(p) {
+  if (!p.gameTotal) return '';
+  var t = p.gameTotal;
+  var color = '';
+  var icon = '';
+  if (t >= 9.5) { color = 'color:var(--grn);font-weight:700'; icon = '&#x1F4C8; '; }
+  else if (t >= 8.5) { color = 'color:var(--gold);font-weight:600'; }
+  else if (t < 7.5) { color = 'color:var(--red);font-weight:600'; icon = '&#x1F4C9; '; }
+  return '<span style="' + color + '">' + icon + 'O/U ' + t.toFixed(1) + '</span>';
+}
+
 function init() {
   var today = new Date();
   var dateStr = today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -476,7 +495,7 @@ function wireButtons() {
   document.getElementById('searchRefresh').addEventListener('click', loadTopPicks);
   document.getElementById('myRefresh').addEventListener('click', loadMyPlayers);
 
-  ['searchFilterAvg','searchFilterRecent','searchFilterLineup','searchFilterMatchup','searchFilterPark','searchFilterLoc','searchFilterPitcher'].forEach(function(groupId) {
+  ['searchFilterAvg','searchFilterRecent','searchFilterTotal','searchFilterLineup','searchFilterMatchup','searchFilterPark','searchFilterLoc','searchFilterPitcher'].forEach(function(groupId) {
     var group = document.getElementById(groupId);
     if (!group) return;
     var chips = group.querySelectorAll('.fbtn');
@@ -598,7 +617,7 @@ function renderTop() {
     // v14: lineup badge before name
     html += '<div class="pick-name">' + lineupBadgeHTML(p) + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
-    html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + recentFormHTML(p) + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + '</div>';
+    html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + recentFormHTML(p) + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + (p.gameTotal ? ' &middot; ' + gameTotalHTML(p) : '') + '</div>';
 
     var tBadges = [];
     var slumpHtml = slumpBadge(p);
@@ -668,6 +687,7 @@ function renderSearch() {
 
   var minAvg = parseFloat(getFilterVal('searchFilterAvg') || '0');
   var recentVal = getFilterVal('searchFilterRecent') || '0';
+  var minTotal = parseFloat(getFilterVal('searchFilterTotal') || '0');
   var lineupVal = getFilterVal('searchFilterLineup') || 'any';
   var matchup = getFilterVal('searchFilterMatchup') || 'any';
   var park = getFilterVal('searchFilterPark') || 'any';
@@ -676,6 +696,11 @@ function renderSearch() {
 
   var filtered = picksData.picks.filter(function(p) {
     if (minAvg > 0 && p.seasonAvg < minAvg) return false;
+
+    // v15: game total filter
+    if (minTotal > 0) {
+      if (!p.gameTotal || p.gameTotal < minTotal) return false;
+    }
 
     // v14: recent form filter
     if (recentVal === 'hot') {
@@ -788,7 +813,7 @@ function renderSearch() {
     html += '<div class="pick-main">';
     html += '<div class="pick-name">' + lineupBadgeHTML(p) + p.name + '</div>';
     html += '<div class="pick-vs">' + p.team + ' ' + locIcon + ' vs ' + oppPitcher + ' &middot; ' + handDisp + '</div>';
-    html += '<div class="pick-stats">Season ' + seasonAvgDisp + recentFormHTML(p) + bvpLine + '</div>';
+    html += '<div class="pick-stats">Season ' + seasonAvgDisp + recentFormHTML(p) + bvpLine + (p.gameTotal ? ' &middot; ' + gameTotalHTML(p) : '') + '</div>';
     html += badgeStr;
     html += '</div>';
     html += '<div>';
