@@ -148,7 +148,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 </style>
 </head>
 <body>
-<div class="ver-tag">v15 vegas totals</div>
+<div class="ver-tag">v16 real model</div>
 <div class="toast" id="toast"></div>
 <header>
   <div class="logo">
@@ -366,7 +366,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(238,243,251,.97);backdr
 <div class="screen" id="s-guide">
   <div class="sh">How Hit Probability is Calculated</div>
   <div class="ibox gold"><strong>Pulling live from MLB Stats API:</strong><br>&bull; Each team's active hitters with 5+ ABs<br>&bull; Last 15 games rolling AVG (recent form)<br>&bull; Career batter vs pitcher (BvP) record<br>&bull; Today's confirmed lineup + batting order<br>&bull; Ballpark hit factor<br>&bull; Starting pitcher ERA/WHIP/BAA + last 3 starts</div>
-  <div class="ibox grn"><strong>Formula (v14):</strong><br>Season AVG blended with recent 15-game form (50/50 if 30+ABs in last 15) + BvP (40% weight if 10+ ABs, 20% if 5-9 ABs) &times; park hit factor.</div>
+  <div class="ibox grn"><strong>Formula (v16):</strong><br>1. <strong>Bayesian regression</strong> on season AVG (60-AB prior at .250) - kills small-sample flukes<br>2. <strong>Blend</strong> with last-15 form (50/50 if 30+ recent ABs)<br>3. <strong>Multiply</strong> by pitcher BAA / .250 (aces drop hits ~14%, weak P boosts ~12%)<br>4. <strong>Adjust</strong> for K/9 (10+ K/9 reduces effective AVG up to 10%)<br>5. <strong>Park</strong> hit factor (Coors +12%, Petco -6% etc)<br>6. <strong>Game ABs</strong>: 4.2 if batting top 2, 3.9 spots 3-5, 3.6 spots 6-7, 3.3 spots 8-9 (3.8 default)<br>7. <strong>Cap</strong> at 88% (real MLB ceiling for any single game)</div>
   <div class="ibox blu"><strong>Lineup status:</strong> If lineups are confirmed for tonight's games, you'll see a batting order badge (1-9). Top of order = more ABs = better odds. Yellow "?" badge = lineup not posted yet.</div>
   <div class="ibox red"><strong>Slump warning:</strong> If a player's last-15 AVG is well below their season AVG, you'll see a &#x1F4C9; badge. Consider fading slumping vets.</div>
   <div class="ibox">&#x1F6E1; <strong>Streak Saver</strong> activates at 10-game streak automatically.</div>
@@ -606,7 +606,12 @@ function renderTop() {
     var pfDisp = Math.round(p.parkFactor * 100);
     var oppPitcher = p.opposingPitcher || 'TBD';
     var pitcherERA = p.pitcherStats && p.pitcherStats.era ? p.pitcherStats.era.toFixed(2) : null;
-    var pitcherInfo = oppPitcher + (pitcherERA ? ' (' + pitcherERA + ' ERA)' : '');
+    var pitcherBAA = p.pitcherStats && p.pitcherStats.baa ? '.' + String(Math.round(p.pitcherStats.baa*1000)).padStart(3,'0') : null;
+    var pitcherInfoBits = [];
+    if (pitcherERA) pitcherInfoBits.push(pitcherERA + ' ERA');
+    if (pitcherBAA) pitcherInfoBits.push(pitcherBAA + ' BAA');
+    var pitcherInfo = oppPitcher + (pitcherInfoBits.length ? ' (' + pitcherInfoBits.join(', ') + ')' : '');
+    var handDisp = (p.batSide || 'R') + 'HB vs ' + (p.pitcherHand || 'R') + 'HP';
 
     var nameEsc = String(p.name).replace(/"/g,'&quot;');
     var teamEsc = String(p.team).replace(/"/g,'&quot;');
@@ -616,10 +621,12 @@ function renderTop() {
     html += '<div class="pick-main">';
     // v14: lineup badge before name
     html += '<div class="pick-name">' + lineupBadgeHTML(p) + p.name + '</div>';
-    html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + '</div>';
+    html += '<div class="pick-vs">' + p.team + ' ' + loc + ' vs ' + pitcherInfo + ' &middot; ' + handDisp + '</div>';
     html += '<div class="pick-stats">Season .' + String(Math.round(p.seasonAvg*1000)).padStart(3,'0') + recentFormHTML(p) + ' &middot; Park ' + pfDisp + ' &middot; ' + bvpHtml + (p.gameTotal ? ' &middot; ' + gameTotalHTML(p) : '') + '</div>';
 
     var tBadges = [];
+    // v16: ace pitcher warning - top priority badge
+    if (p.pitcherDominant) tBadges.push('<span style="color:var(--red);font-weight:700">&#x1F6AB; P dominant</span>');
     var slumpHtml = slumpBadge(p);
     if (slumpHtml) tBadges.push(slumpHtml);
     if (p.platoonAdvantage) tBadges.push('<span style="color:var(--grn);font-weight:700">&#x26A1; platoon</span>');
@@ -769,6 +776,8 @@ function renderSearch() {
     var oppPitcher = p.opposingPitcher || 'TBD';
 
     var badges = [];
+    // v16: ace pitcher warning
+    if (p.pitcherDominant) badges.push('<span style="color:var(--red);font-weight:700">&#x1F6AB; P dominant</span>');
     var slumpHtml = slumpBadge(p);
     if (slumpHtml) badges.push(slumpHtml);
     if (p.platoonAdvantage) badges.push('<span class="pick-bvp-yes">PLATOON &#x26A1;</span>');
