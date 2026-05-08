@@ -162,9 +162,9 @@ async function getPitcherStats(pitcherId, season) {
   try {
     const data = await fetchJson(url, 3500);
     const people = data.people || [];
-    if (!people.length) return { era: 0, whip: 0, baa: 0, pitchHand: 'R' };
+    if (!people.length) return { era: 0, whip: 0, baa: 0, k9: 0, pitchHand: 'R' };
     const person = people[0];
-    let era = 0, whip = 0, baa = 0;
+    let era = 0, whip = 0, baa = 0, k9 = 0;
     const ps = person.stats || [];
     for (const block of ps) {
       const splits = block.splits || [];
@@ -173,15 +173,23 @@ async function getPitcherStats(pitcherId, season) {
         era = parseFloat(stat.era || '0') || 0;
         whip = parseFloat(stat.whip || '0') || 0;
         baa = parseFloat(stat.avg || '0') || 0;
+        // v16: extract K/9
+        const ipStr = stat.inningsPitched || '0';
+        const ipParts = String(ipStr).split('.');
+        const wholeIp = parseInt(ipParts[0] || '0', 10);
+        const fracOuts = parseInt(ipParts[1] || '0', 10);
+        const totalIp = wholeIp + (fracOuts / 3);
+        const so = parseInt(stat.strikeOuts || '0', 10) || 0;
+        k9 = totalIp > 0 ? (9 * so / totalIp) : 0;
       }
     }
     var pitchHand = 'R';
     if (person.pitchHand && person.pitchHand.code) {
       pitchHand = person.pitchHand.code;
     }
-    return { era: era, whip: whip, baa: baa, pitchHand: pitchHand };
+    return { era: era, whip: whip, baa: baa, k9: k9, pitchHand: pitchHand };
   } catch (e) {}
-  return { era: 0, whip: 0, baa: 0, pitchHand: 'R' };
+  return { era: 0, whip: 0, baa: 0, k9: 0, pitchHand: 'R' };
 }
 
 async function getPitcherLast3(pitcherId, season) {
@@ -399,7 +407,7 @@ _internalHandler = async function() {
     const teamBatters = {};
     teamIdArr.forEach((id, i) => { teamBatters[id] = teamBattersArrays[i] || []; });
     const pitcherStats = {};
-    pitcherIdArr.forEach((id, i) => { pitcherStats[id] = pitcherStatsArr[i] || { era:0, whip:0, baa:0, pitchHand:'R' }; });
+    pitcherIdArr.forEach((id, i) => { pitcherStats[id] = pitcherStatsArr[i] || { era:0, whip:0, baa:0, k9:0, pitchHand:'R' }; });
     const pitcherLast3 = {};
     pitcherIdArr.forEach((id, i) => { pitcherLast3[id] = pitcherLast3Arr[i] || { starts:0, era:0, ip:0, er:0 }; });
     const pitcherVsTeam = {};
@@ -469,36 +477,86 @@ _internalHandler = async function() {
     bvpTasks.forEach((task, i) => {
       const bvp = bvpResults[i];
       const seasonAvg = task.batter.avg;
+      const seasonAb = task.batter.ab || 0;
+      const seasonHits = task.batter.hits || 0;
       const recentForm = recentFormByBatter[task.batter.personId] || { games:0, ab:0, hits:0, avg:0 };
 
-      // v14: blend uses recent form too if we have meaningful sample
-      // Old: season + BvP only. New: weight recent form alongside season.
-      let blended = seasonAvg;
+      // ===== v16 FIX 1: Bayesian regression =====
+      // True talent = (hits + 60 * .250) / (ab + 60)
+      // Strong prior of 60 ABs at league avg .250 anchors small samples to reality
+      // - 9 ABs of .667 -> ~.310 (realistic)
+      // - 600 ABs of .310 -> stays .310 (unchanged)
+      const PRIOR_AB = 60;
+      const PRIOR_AVG = 0.250;
+      const trueTalent = (seasonHits + PRIOR_AB * PRIOR_AVG) / (seasonAb + PRIOR_AB);
+
+      // ===== v16 FIX (recent form weight increased to 50/50) =====
+      // Blend true talent with last-15 form. Heavier weight on recent form than v14.
+      let blended = trueTalent;
       if (recentForm.ab >= 30) {
-        // Solid 15-game sample: 50% season + 50% recent
-        blended = 0.5 * seasonAvg + 0.5 * recentForm.avg;
+        blended = 0.5 * trueTalent + 0.5 * recentForm.avg;
       } else if (recentForm.ab >= 15) {
-        // Partial sample: 70% season + 30% recent
-        blended = 0.7 * seasonAvg + 0.3 * recentForm.avg;
+        blended = 0.65 * trueTalent + 0.35 * recentForm.avg;
       }
-      // Then layer in BvP if we have it
-      if (bvp.ab >= 10) blended = 0.6 * blended + 0.4 * bvp.avg;
-      else if (bvp.ab >= 5) blended = 0.8 * blended + 0.2 * bvp.avg;
 
-      const adjusted = blended * task.parkHit;
-      const perAB = Math.min(0.99, Math.max(0.01, adjusted));
-      const gameHitProb = 1 - Math.pow(1 - perAB, 4);
+      // BvP adjustment (only if meaningful sample)
+      if (bvp.ab >= 10) blended = 0.7 * blended + 0.3 * bvp.avg;
+      else if (bvp.ab >= 5) blended = 0.85 * blended + 0.15 * bvp.avg;
 
+      // Resolve pitcher data NOW (need it for adjustment)
       const pStat = task.pitcherId ? pitcherStats[task.pitcherId] : null;
       const pLast3 = task.pitcherId ? pitcherLast3[task.pitcherId] : { starts:0, era:0, ip:0, er:0 };
       const vsTeamKey = task.pitcherId + '_' + task.teamId;
       const pVsTeam = pitcherVsTeam[vsTeamKey] || { starts:0, era:0, ip:0, er:0 };
+
+      // ===== v16 FIX 2: Pitcher BAA adjustment =====
+      // The single biggest fix. League avg BAA is ~.250.
+      // A pitcher with .215 BAA suppresses hits ~14%. .280 BAA inflates hits ~12%.
+      let pitcherAdj = 1.0;
+      if (pStat && pStat.baa > 0.150 && pStat.baa < 0.350) {
+        pitcherAdj = pStat.baa / 0.250;
+      }
+
+      // ===== v16 BONUS: K/9 weight =====
+      // High-K pitchers suppress hits beyond what BAA alone shows.
+      // League avg K/9 ~9.0. Each K/9 above 10 reduces effective avg ~2%.
+      let k9Adj = 1.0;
+      if (pStat && pStat.k9 > 10) {
+        k9Adj = 1.0 - Math.min(0.10, (pStat.k9 - 10) * 0.02);
+      }
+
+      // Park hit factor
+      const parkAdj = task.parkHit;
+
+      // Final per-AB hit probability
+      const adjusted = blended * pitcherAdj * k9Adj * parkAdj;
+      const perAB = Math.min(0.50, Math.max(0.05, adjusted));
+
+      // ===== v16 FIX 4: Use 3.8 ABs (realistic average) =====
+      // Top of order gets 4.0+, bottom gets ~3.4. League avg = 3.8.
+      // Adjust slightly by lineup spot if we know it.
+      let expectedAbs = 3.8;
+      if (task.battingOrder) {
+        if (task.battingOrder <= 2) expectedAbs = 4.2;
+        else if (task.battingOrder <= 5) expectedAbs = 3.9;
+        else if (task.battingOrder <= 7) expectedAbs = 3.6;
+        else expectedAbs = 3.3;
+      }
+      const gameHitProbRaw = 1 - Math.pow(1 - perAB, expectedAbs);
+
+      // ===== v16 FIX 3: Realistic ceiling cap =====
+      // The mathematical maximum single-game hit probability in MLB is ~88%.
+      // Anything higher is model error. Cap to prevent overconfidence.
+      const gameHitProb = Math.min(0.88, gameHitProbRaw);
 
       const batSide = task.batter.batSide || 'R';
       const pHand = (pStat && pStat.pitchHand) || 'R';
       let platoonAdv = false;
       if (batSide === 'S') platoonAdv = true;
       else if (batSide !== pHand) platoonAdv = true;
+
+      // v16 BONUS: dominant pitcher flag (BAA < .220 = ace-level)
+      const pitcherDominant = !!(pStat && pStat.baa > 0 && pStat.baa < 0.220);
 
       picks.push({
         name: task.batter.name,
@@ -509,7 +567,8 @@ _internalHandler = async function() {
         seasonAvg: seasonAvg,
         seasonAb: task.batter.ab,
         seasonOps: task.batter.ops,
-        // v14 NEW
+        // v16: expose true talent for transparency
+        trueTalent: Math.round(trueTalent * 1000) / 1000,
         recentAvg: recentForm.avg,
         recentAb: recentForm.ab,
         recentHits: recentForm.hits,
@@ -517,13 +576,13 @@ _internalHandler = async function() {
         battingOrder: task.battingOrder,
         lineupConfirmed: task.lineupConfirmed,
         gameTotal: task.gameTotal,
-        // existing
         bvpAb: bvp.ab,
         bvpHits: bvp.hits,
         bvpAvg: bvp.avg,
         opposingPitcher: task.pitcherName,
         pitcherStats: pStat,
         pitcherHand: pHand,
+        pitcherDominant: pitcherDominant,
         pitcherLast3: pLast3,
         pitcherVsTeam: pVsTeam,
         platoonAdvantage: platoonAdv,
